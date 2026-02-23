@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="Mcp.Connector.Template.Tests/Mcp.Connector.Template.Tests.csproj" Id="6560a6cb-a9b2-48e8-a36b-4af2704c7812" />
   <Project Path="Mcp.Connector.Template/Mcp.Connector.Template.csproj" />
 </Solution>
