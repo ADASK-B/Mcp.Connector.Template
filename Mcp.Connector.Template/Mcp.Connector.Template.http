@@ -1,0 +1,6 @@
+@Mcp.Connector.Template_HostAddress = http://localhost:5076
+
+GET {{Mcp.Connector.Template_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
