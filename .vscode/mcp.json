@@ -1,0 +1,62 @@
+{
+  "servers": {
+    // ──────────────────────────────────────────────────────────────
+    // 1. grpcmcp — Direct gRPC interaction via reflection/descriptors
+    //    Invoke, list, describe gRPC methods from the AI.
+    //    Install: go install github.com/adiom-data/grpcmcp@latest
+    //    Repo:    https://github.com/adiom-data/grpcmcp
+    // ──────────────────────────────────────────────────────────────
+    // "grpcmcp": {
+    //   "type": "stdio",
+    //   "command": "grpcmcp",
+    //   "args": ["--reflect"],
+    //   "env": {
+    //     "GRPCMCP_URL": "localhost:5001"
+    //   }
+    // }
+
+    // ──────────────────────────────────────────────────────────────
+    // 2. grpcurl-mcp — gRPC interaction via grpcurl wrapper
+    //    Tools: invoke, list, describe gRPC services.
+    //    Install: go install github.com/wricardo/mcp-grpcurl@latest
+    //    Prereq:  grpcurl (https://github.com/fullstorydev/grpcurl)
+    //    Repo:    https://github.com/wricardo/grpcurl-mcp
+    // ──────────────────────────────────────────────────────────────
+    // "grpcurl-mcp": {
+    //   "type": "stdio",
+    //   "command": "mcp-grpcurl",
+    //   "env": {
+    //     "ADDRESS": "localhost:5001"
+    //   }
+    // }
+
+    // ──────────────────────────────────────────────────────────────
+    // 3. api-docs-mcp — Proto/API documentation for AI
+    //    Reads .proto files or gRPC reflection and exposes
+    //    api_docs + api_search tools for schema browsing.
+    //    Install: npm install -g api-docs-mcp
+    //    Repo:    https://github.com/EliFuzz/api-docs-mcp
+    // ──────────────────────────────────────────────────────────────
+    // "api-docs-mcp": {
+    //   "type": "stdio",
+    //   "command": "npx",
+    //   "args": ["api-docs-mcp"],
+    //   "env": {
+    //     "API_SOURCES": "[{\"name\":\"gRPC_AGENT\",\"path\":\"${workspaceFolder}/Protos/greet.proto\",\"type\":\"grpc\"}]"
+    //   }
+    // }
+
+    // ──────────────────────────────────────────────────────────────
+    // 4. Context7 — Up-to-date library documentation
+    //    Fetches latest docs for Grpc.AspNetCore, Protobuf, etc.
+    //    Eliminates outdated/hallucinated API references.
+    //    No install needed — runs via npx.
+    //    Repo: https://github.com/upstash/context7
+    // ──────────────────────────────────────────────────────────────
+    // "context7": {
+    //   "type": "stdio",
+    //   "command": "npx",
+    //   "args": ["-y", "@upstash/context7-mcp@latest"]
+    // }
+  }
+}
