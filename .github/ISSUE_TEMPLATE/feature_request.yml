@@ -1,0 +1,41 @@
+name: Feature Request
+description: Suggest a new feature or improvement for the MCP Connector Template
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature!
+        Please describe what you need and why it would be valuable.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: |
+        What problem are you trying to solve?
+        Describe the use case that is currently not well-supported.
+      placeholder: "I'm trying to build a connector that does X, but the template doesn't support Y."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or change you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other approaches did you consider? Why are they insufficient?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that helps clarify the request (links, code snippets, diagrams, etc.)
