@@ -1,0 +1,11 @@
+{
+	"hooks": {
+		// After Copilot generates or edits code, run a build to catch compile errors immediately
+		"Stop": [
+			{
+				"type": "command",
+				"command": "dotnet build --no-restore --verbosity quiet"
+			}
+		]
+	}
+}
