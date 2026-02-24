@@ -1,6 +1,56 @@
 @Mcp.Connector.Template_HostAddress = http://localhost:5076
 
-GET {{Mcp.Connector.Template_HostAddress}}/weatherforecast/
+### Health check
+GET {{Mcp.Connector.Template_HostAddress}}/health
 Accept: application/json
+
+###
+
+### MCP initialize — establish a session with the server
+POST {{Mcp.Connector.Template_HostAddress}}/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": { "name": "vscode", "version": "1.0.0" }
+  }
+}
+
+###
+
+### MCP tools/list — list all available tools
+POST {{Mcp.Connector.Template_HostAddress}}/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+
+###
+
+### MCP tools/call — invoke the echo tool
+POST {{Mcp.Connector.Template_HostAddress}}/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "echo",
+    "arguments": { "message": "Hello, MCP!" }
+  }
+}
 
 ###
