@@ -5,7 +5,7 @@
 [![Build and Test](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/build-and-test.yml)
 [![CodeQL](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/codeql.yml/badge.svg)](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/codeql.yml)
 [![Docker](https://img.shields.io/badge/Docker-GHCR-2496ed?logo=docker&logoColor=white)](https://github.com/ADASK-B/Mcp.Connector.Template/pkgs/container/mcp.connector.template)
-[![License](https://img.shields.io/badge/license-proprietary-lightgrey)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > **Enterprise template repository** for building [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) connector services in C#.  
 > Clone this template, add your tools — get a production-ready, container-first MCP server with CI/CD, security scanning, and AI-assisted development out of the box.
@@ -568,4 +568,4 @@ docs: update README with new tool guide
 
 ## License
 
-This project is proprietary to [ADASK-B](https://github.com/ADASK-B). All rights reserved.
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
