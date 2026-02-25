@@ -108,34 +108,24 @@ This example demonstrates the full pattern: input validation, error handling, te
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────┐
-│                 MCP Client                  │
-│  (Claude Desktop, VS Code Copilot, OpenAI)  │
-└──────────────────┬──────────────────────────┘
-                   │ Streamable HTTP (JSON-RPC)
-                   ▼
-┌─────────────────────────────────────────────┐
-│             ASP.NET Core Host               │
-│                                             │
-│  GET  /health    → Health probe (200 OK)    │
-│  POST /mcp       → MCP JSON-RPC endpoint   │
-│                                             │
-│  ┌───────────────────────────────────────┐  │
-│  │         MCP SDK Middleware            │  │
-│  │  initialize → tools/list → tools/call │  │
-│  └──────────────┬────────────────────────┘  │
-│                 │                            │
-│  ┌──────────────▼────────────────────────┐  │
-│  │     Tool Classes ([McpServerToolType]) │  │
-│  │     Auto-discovered via assembly scan │  │
-│  └──────────────┬────────────────────────┘  │
-│                 │ DI (method injection)      │
-│  ┌──────────────▼────────────────────────┐  │
-│  │     Service Classes (HttpClient)      │  │
-│  │     External API communication        │  │
-│  └───────────────────────────────────────┘  │
-└─────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Client["MCP Client<br/>(Claude Desktop, VS Code Copilot, OpenAI)"]
+    Client -->|"Streamable HTTP (JSON-RPC)"| Host
+
+    subgraph Host["ASP.NET Core Host"]
+        direction TB
+        Endpoints["GET /health - Health probe (200 OK)<br/>POST /mcp - MCP JSON-RPC endpoint"]
+        SDK["MCP SDK Middleware<br/>initialize → tools/list → tools/call"]
+        Tools["Tool Classes [McpServerToolType]<br/>Auto-discovered via assembly scan"]
+        Services["Service Classes (HttpClient)<br/>External API communication"]
+
+        Endpoints --> SDK
+        SDK --> Tools
+        Tools -->|"DI (method injection)"| Services
+    end
+
+    Services -->|"HTTP"| API["External APIs"]
 ```
 
 ### Key Design Decisions
