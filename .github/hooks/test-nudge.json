@@ -1,0 +1,15 @@
+{
+	"hooks": {
+		// When the agent finishes, check if any Tool or Service class is missing unit tests.
+		// If tests are missing, the agent is told to write them before it can stop.
+		// The stop_hook_active guard prevents infinite loops (runs only once).
+		"Stop": [
+			{
+				"type": "command",
+				"windows": "powershell -ExecutionPolicy Bypass -File .github/hooks/scripts/check-missing-tests.ps1",
+				"command": "bash .github/hooks/scripts/check-missing-tests.sh",
+				"timeout": 15
+			}
+		]
+	}
+}
