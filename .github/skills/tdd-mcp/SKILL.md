@@ -72,12 +72,12 @@ public class MyToolTests
     }
 
     [Fact]
-    public async Task ToolAction_InputTooLong_ThrowsMcpProtocolException()
+    public async Task ToolAction_InputTooLong_ThrowsMcpException()
     {
         var service = CreateServiceWithMockHandler();
         var longInput = new string('x', 201);
         var act = () => MyTool.ToolAction(service, longInput, CancellationToken.None);
-        await act.Should().ThrowAsync<McpProtocolException>();
+        await act.Should().ThrowAsync<McpException>();
     }
 
     [Fact]
@@ -157,7 +157,7 @@ All three commands must succeed with zero errors.
 - [ ] All unit tests pass (validation, mapping, error handling)
 - [ ] All integration tests pass (health endpoint, MCP protocol)
 - [ ] `[Description]` on every tool method and parameter
-- [ ] Input validation with `ArgumentException` and `McpProtocolException`
+- [ ] Input validation with `ArgumentException` and `McpException`
 - [ ] External API calls wrapped in try/catch
 - [ ] `CancellationToken` on all async methods
 - [ ] Zero real HTTP calls in tests

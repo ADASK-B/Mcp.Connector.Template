@@ -1,6 +1,43 @@
 @Mcp.Connector.Template_HostAddress = http://localhost:5076
 
-GET {{Mcp.Connector.Template_HostAddress}}/weatherforecast/
+### Health probe — container liveness check
+GET {{Mcp.Connector.Template_HostAddress}}/health
 Accept: application/json
+
+###
+
+### MCP initialize — start a new MCP session
+POST {{Mcp.Connector.Template_HostAddress}}/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+        "protocolVersion": "2025-03-26",
+        "capabilities": {},
+        "clientInfo": {
+            "name": "http-file-client",
+            "version": "1.0.0"
+        }
+    }
+}
+
+###
+
+### MCP tools/list — discover available tools
+POST {{Mcp.Connector.Template_HostAddress}}/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+mcp-session-id: {{$dotenv MCP_SESSION_ID}}
+
+{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list",
+    "params": {}
+}
 
 ###

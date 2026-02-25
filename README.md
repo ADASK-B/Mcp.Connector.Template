@@ -1,7 +1,7 @@
 # Mcp.Connector.Template
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512bd4)](https://dotnet.microsoft.com/)
-[![MCP SDK](https://img.shields.io/badge/MCP_SDK-0.x-blue)](https://github.com/modelcontextprotocol/csharp-sdk)
+[![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.0-blue)](https://github.com/modelcontextprotocol/csharp-sdk)
 [![Build and Test](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/build-and-test.yml)
 [![CodeQL](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/codeql.yml/badge.svg)](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/codeql.yml)
 [![Docker](https://img.shields.io/badge/Docker-GHCR-2496ed?logo=docker&logoColor=white)](https://github.com/ADASK-B/Mcp.Connector.Template/pkgs/container/mcp.connector.template)
@@ -61,6 +61,32 @@ This template provides the complete scaffolding for an MCP connector service:
 - **Pull request template**, issue templates, and CODEOWNERS for governance
 
 New connectors are created by using this repo as a GitHub template and adding tool/service/model classes. The hosting framework, CI/CD, and Copilot configuration stay untouched.
+
+---
+
+## Included Example: Weather Tool
+
+The template ships with a **fully working example** — an MCP tool that wraps the [Open-Meteo](https://open-meteo.com/) weather API (free, no API key required).
+
+| Component | File | Description |
+|-----------|------|-------------|
+| **Tool** | `Tools/WeatherTool.cs` | `getWeather` — returns current weather for a city |
+| **Service** | `Services/OpenMeteoService.cs` | HTTP client wrapper for the Open-Meteo REST API |
+| **Models** | `Models/WeatherModels.cs` | API response DTOs + clean result record for the LLM |
+
+**Supported cities:** New York, London, Berlin, Tokyo, Sydney, Paris, Vienna, Zurich.
+
+**Example interaction:**
+```
+User:  "What's the weather in Berlin?"
+LLM:   → calls getWeather("Berlin")
+Tool:  → fetches from api.open-meteo.com
+LLM:   "It's currently 8.3°C in Berlin with 72% humidity and 15 km/h wind."
+```
+
+**Response fields:** City, TemperatureCelsius, TemperatureFahrenheit, HumidityPercent, WindSpeedKmh, Timezone, MeasuredAt.
+
+This example demonstrates the full pattern: input validation, error handling, temperature conversion, `CancellationToken` forwarding, and corresponding unit + integration tests. Use it as a reference when adding your own tools.
 
 ---
 
@@ -216,9 +242,18 @@ Point any MCP-compatible client to the server URL:
 
 | Client | Configuration |
 |--------|--------------|
-| **VS Code Copilot** | Add server URL in MCP settings |
-| **Claude Desktop** | Add to `claude_desktop_config.json` |
+| **VS Code Copilot** | Already preconfigured in `.vscode/mcp.json` — just start the Docker container |
+| **Claude Desktop** | Add to `claude_desktop_config.json` as remote MCP server |
 | **OpenAI Responses API** | Use as remote MCP server URL |
+
+**Quick start with Docker + VS Code Copilot:**
+
+```bash
+# Start the container
+docker run -p 8080:8080 ghcr.io/adask-b/mcp.connector.template:latest
+```
+
+The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://localhost:8080/mcp`. Once the container is running, VS Code Copilot can use the `getWeather` tool directly in chat.
 
 ---
 
@@ -362,7 +397,7 @@ Five specialist agents follow an **orchestrator pattern** — use the orchestrat
 
 | Agent | File | Purpose |
 |-------|------|---------|
-| **orchestrator** | `.github/agents/orchestrator.agent.md` | Plans, delegates, and reviews. Never edits code directly — always delegates to specialist agents. Use for tasks spanning 2+ domains. |
+| **orchestrator** | `.github/agents/orchestrator.agent.md` | Plans, delegates, and reviews multi-step tasks. Has access to all tools and all subagents (`agents: ['*']`). Use for tasks spanning 2+ domains. |
 | **mcp-tool-creator** | `.github/agents/mcp-tool-creator.agent.md` | Scaffolds complete MCP tools: Tool class, Service, Models, DI registration, and test stubs. |
 | **test** | `.github/agents/test.agent.md` | TDD specialist — writes, fixes, and improves unit and integration tests. |
 | **security** | `.github/agents/security.agent.md` | Hardens GitHub Actions workflows, audits dependencies, checks for secrets exposure. |

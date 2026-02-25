@@ -29,7 +29,7 @@ dotnet test --configuration Release --no-build --verbosity normal
 - [ ] `[McpServerToolType]` on the tool class
 - [ ] `[McpServerTool(Name = "camelCase")]` with `[Description]` on every tool method
 - [ ] `[Description]` on every LLM-visible parameter
-- [ ] Input validation at method entry (`ArgumentException`, `McpProtocolException`)
+- [ ] Input validation at method entry (`ArgumentException`, `McpException`)
 - [ ] External API calls wrapped in try/catch
 - [ ] `CancellationToken` as last parameter
 

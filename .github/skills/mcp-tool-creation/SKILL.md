@@ -113,9 +113,8 @@ public static class MyNewTool
         ArgumentException.ThrowIfNullOrWhiteSpace(inputParam);
 
         if (inputParam.Length > 200)
-            throw new McpProtocolException(
-                "inputParam exceeds maximum length of 200 characters",
-                McpErrorCode.InvalidParams);
+            throw new McpException(
+                "inputParam exceeds maximum length of 200 characters.");
 
         // 2. Call external API via injected service
         try
@@ -136,7 +135,7 @@ public static class MyNewTool
 - Method: `public static`, `[McpServerTool(Name = "camelCase")]`, `[Description("...")]`
 - Tool name in `camelCase` (this is what LLM clients see)
 - `[Description]` is mandatory on method AND on every LLM-visible parameter
-- Validate input immediately — throw `McpProtocolException` for invalid args
+- Validate input immediately — throw `McpException` for invalid args
 - Wrap external calls in try/catch — return error JSON, never throw raw exceptions
 - Always include `CancellationToken` as last parameter
 
@@ -172,9 +171,9 @@ public class MyNewToolTests
     }
 
     [Fact]
-    public async Task MyToolAction_InputTooLong_ThrowsMcpProtocolException()
+    public async Task MyToolAction_InputTooLong_ThrowsMcpException()
     {
-        // Assert.ThrowsAsync<McpProtocolException>(...)
+        // Assert.ThrowsAsync<McpException>(...)
     }
 }
 ```

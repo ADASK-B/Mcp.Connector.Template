@@ -135,7 +135,7 @@ Mcp.Connector.Template.Tests/
 - **No HTTPS**: HTTPS termination happens at PaaS/Ingress level — the container listens on plain HTTP 8080
 - **No OpenAPI**: OpenAPI is off — MCP SDK handles tool discovery via the MCP protocol
 - **Logging**: Use `ILogger<T>`, structured logging, logs go to stdout
-- **Validation**: Validate tool arguments early (null/empty checks, max length, allowed characters) and throw `McpProtocolException` with `McpErrorCode.InvalidParams`
+- **Validation**: Validate tool arguments early (null/empty checks, max length, allowed characters) and throw `McpException` for invalid input
 - **Error handling**: Wrap external API calls in try/catch, return meaningful error text — never let raw exceptions bubble to the MCP client
 
 ## Container Rules
@@ -177,7 +177,7 @@ Mcp.Connector.Template.Tests/
 
 ## Official References
 
-> **SDK version note:** `ModelContextProtocol 0.x` (checked February 2026).
+> **SDK version note:** `ModelContextProtocol 1.0` (checked February 2026).
 
 | Resource | URL |
 |----------|-----|

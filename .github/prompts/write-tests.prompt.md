@@ -27,7 +27,7 @@ Generate comprehensive tests for the following target:
 ### For Tool classes:
 - Valid input → expected JSON output
 - Null/empty required parameter → `ArgumentException`
-- Parameter exceeding constraints → `McpProtocolException` with `InvalidParams`
+- Parameter exceeding constraints → `McpException`
 - External API failure → graceful error response (JSON with error field)
 
 ### For Service classes:

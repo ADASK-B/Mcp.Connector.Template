@@ -62,10 +62,10 @@ public static class ExampleTool
 ### Input Validation
 - Validate all tool parameters at the start of the method
 - Use `ArgumentException.ThrowIfNullOrWhiteSpace()` for required strings
-- For constraint violations, throw `McpProtocolException` with `McpErrorCode.InvalidParams`:
+- For constraint violations, throw `McpException` with a descriptive message:
 ```csharp
 if (input.Length > 100)
-    throw new McpProtocolException("Input exceeds maximum length of 100 characters", McpErrorCode.InvalidParams);
+    throw new McpException("Input exceeds maximum length of 100 characters.");
 ```
 
 ### Return Values

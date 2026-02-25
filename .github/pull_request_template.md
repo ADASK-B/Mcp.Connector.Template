@@ -23,7 +23,7 @@ Closes #<!-- issue number -->
 
 ### MCP Tools (if applicable)
 - [ ] `[Description]` on every tool method and LLM-visible parameter
-- [ ] Input validation at method entry (`ArgumentException`, `McpProtocolException`)
+- [ ] Input validation at method entry (`ArgumentException`, `McpException`)
 - [ ] External API calls wrapped in try/catch
 - [ ] `CancellationToken` as last parameter on all async methods
 

@@ -27,7 +27,7 @@ Add a new MCP tool to this project following the architecture in `copilot-instru
 ## Checklist
 
 - [ ] `[Description]` on every tool method and every LLM-visible parameter
-- [ ] Input validation with `ArgumentException.ThrowIfNullOrWhiteSpace` and `McpProtocolException`
+- [ ] Input validation with `ArgumentException.ThrowIfNullOrWhiteSpace` and `McpException`
 - [ ] External API calls wrapped in try/catch — error JSON returned, no raw exceptions
 - [ ] `CancellationToken` as last parameter on all async methods
 - [ ] All external HTTP mocked in tests — zero real network calls

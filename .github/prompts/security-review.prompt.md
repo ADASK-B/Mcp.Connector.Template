@@ -21,7 +21,7 @@ Perform a focused security review of this MCP Connector project. Check each area
 
 - [ ] All tool parameters validated at method entry
 - [ ] `ArgumentException.ThrowIfNullOrWhiteSpace()` for required strings
-- [ ] `McpProtocolException` with `InvalidParams` for constraint violations
+- [ ] `McpException` for constraint violations (e.g. input too long)
 - [ ] No user input passed to `Process.Start()`, file system paths, or SQL
 - [ ] Max length / allowed character checks where appropriate
 
