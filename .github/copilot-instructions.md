@@ -199,3 +199,40 @@ If you fetch an official link above and discover that the SDK API has changed (n
 - `skills/mcp-tool-creation/SKILL.md` — step-by-step skill guide
 
 Rule: **If a pattern in this file conflicts with the current SDK, the SDK documentation wins — fix this file, then continue.**
+
+## Security Rules
+
+- **No secrets in code**: Never commit API keys, tokens, passwords, or connection strings. Use environment variables or a secrets manager.
+- **No unsafe defaults**: Template code must not ship with default passwords, disabled auth, or permissive CORS. When a configuration value is security-sensitive, use a placeholder like `REPLACE_ME` and add a comment.
+- **Dependency hygiene**: Keep NuGet packages up to date. Never reference packages from untrusted feeds. Review transitive dependency changes in PRs.
+- **Container security**: Always run as non-root (`USER $APP_UID`). Never copy secrets into Docker images. Use multi-stage builds to exclude SDK/build tools from the final image.
+- **Input validation**: All MCP tool parameters must be validated before use. Never pass user input directly to shell commands, SQL, or file paths.
+- **Logging safety**: Never log secrets, tokens, or full request/response bodies containing sensitive data. Use structured logging with safe fields only.
+
+## Testing Standard
+
+- **TDD preferred**: When creating or modifying feature code, write or update tests in parallel — ideally test-first (Red → Green → Refactor).
+- **Mandatory test coverage**: Every new MCP tool must have corresponding unit tests (validation, mapping, error handling) and integration tests (WebApplicationFactory-based).
+- **All tests must pass**: Run `dotnet test` locally before pushing. CI will reject PRs with failing tests.
+- **No real external calls**: All external HTTP APIs must be mocked in tests via `HttpMessageHandler`. Zero network calls in the test suite.
+
+## PR Quality
+
+- **Small, focused PRs**: Each PR should address a single concern (one tool, one bug fix, one refactoring). Avoid mixing unrelated changes.
+- **Clear descriptions**: PR title must summarize the change. Description must include: what changed, why, and how to verify.
+- **Reproducible steps**: If the PR adds or modifies MCP tool behavior, include example tool calls and expected responses in the PR description.
+- **Commit hygiene**: Use conventional commit messages (e.g. `feat: add getWeather tool`, `fix: handle null response from API`, `test: add unit tests for validation`).
+- **Review checklist**: Before marking a PR as ready, verify: tests pass, no secrets committed, descriptions on all tool parameters, no `TODO` markers left unresolved.
+
+## CI — Local Commands Before PR
+
+Run these commands locally before pushing a PR:
+
+```bash
+# Restore, build, and test the full solution
+dotnet restore
+dotnet build --configuration Release --no-restore
+dotnet test --configuration Release --no-build --verbosity normal
+```
+
+All three commands must succeed with zero errors and zero test failures.

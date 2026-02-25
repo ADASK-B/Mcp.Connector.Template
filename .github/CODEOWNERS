@@ -1,0 +1,21 @@
+# CODEOWNERS — Mcp.Connector.Template
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Replace placeholder teams with your actual GitHub org/team names.
+
+# Default owners for everything
+*                                       @ADASK-B/platform
+
+# GitHub configuration and CI/CD
+.github/                                @ADASK-B/platform
+
+# MCP Tools, Services, and Models
+Mcp.Connector.Template/Tools/           @ADASK-B/platform
+Mcp.Connector.Template/Services/        @ADASK-B/platform
+Mcp.Connector.Template/Models/          @ADASK-B/platform
+
+# Tests
+Mcp.Connector.Template.Tests/           @ADASK-B/platform
+
+# Container configuration
+Mcp.Connector.Template/Dockerfile       @ADASK-B/platform
