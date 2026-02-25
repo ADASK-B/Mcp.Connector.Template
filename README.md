@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > **Enterprise template repository** for building [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) connector services in C#.  
-> Clone this template, add your tools — get a production-ready, container-first MCP server with CI/CD, security scanning, and AI-assisted development out of the box.
+> Clone this template, add your tools - get a production-ready, container-first MCP server with CI/CD, security scanning, and AI-assisted development out of the box.
 
 ---
 
@@ -66,11 +66,11 @@ New connectors are created by using this repo as a GitHub template and adding to
 
 ## Included Example: Weather Tool
 
-The template ships with a **fully working example** — an MCP tool that wraps the [Open-Meteo](https://open-meteo.com/) weather API (free, no API key required).
+The template ships with a **fully working example** - an MCP tool that wraps the [Open-Meteo](https://open-meteo.com/) weather API (free, no API key required).
 
 | Component | File | Description |
 |-----------|------|-------------|
-| **Tool** | `Tools/WeatherTool.cs` | `getWeather` — returns current weather for a city |
+| **Tool** | `Tools/WeatherTool.cs` | `getWeather` - returns current weather for a city |
 | **Service** | `Services/OpenMeteoService.cs` | HTTP client wrapper for the Open-Meteo REST API |
 | **Models** | `Models/WeatherModels.cs` | API response DTOs + clean result record for the LLM |
 
@@ -95,7 +95,7 @@ This example demonstrates the full pattern: input validation, error handling, te
 | Component | Technology |
 |-----------|-----------|
 | Runtime | .NET 10 (LTS), C# 13 |
-| Framework | ASP.NET Core Minimal API — no controllers |
+| Framework | ASP.NET Core Minimal API - no controllers |
 | MCP SDK | [`ModelContextProtocol.AspNetCore`](https://github.com/modelcontextprotocol/csharp-sdk) (Streamable HTTP) |
 | Container | Docker multi-stage, Linux, port 8080 |
 | Testing | xUnit, FluentAssertions, `Microsoft.AspNetCore.Mvc.Testing` |
@@ -140,11 +140,11 @@ This example demonstrates the full pattern: input validation, error handling, te
 
 ### Key Design Decisions
 
-- **Tools are static classes** with `[McpServerToolType]` — the SDK discovers them automatically via `WithToolsFromAssembly()`
-- **Method-level DI** — dependencies are injected as tool method parameters, not via constructors
-- **No routing changes needed** — adding a new `[McpServerToolType]` class is enough; the SDK handles `tools/list` and `tools/call`
-- **No OpenAPI** — tool discovery happens through the MCP protocol itself
-- **No HTTPS** — TLS termination is handled at the PaaS/ingress level; the container listens on plain HTTP
+- **Tools are static classes** with `[McpServerToolType]` - the SDK discovers them automatically via `WithToolsFromAssembly()`
+- **Method-level DI** - dependencies are injected as tool method parameters, not via constructors
+- **No routing changes needed** - adding a new `[McpServerToolType]` class is enough; the SDK handles `tools/list` and `tools/call`
+- **No OpenAPI** - tool discovery happens through the MCP protocol itself
+- **No HTTPS** - TLS termination is handled at the PaaS/ingress level; the container listens on plain HTTP
 
 ---
 
@@ -242,7 +242,7 @@ Point any MCP-compatible client to the server URL:
 
 | Client | Configuration |
 |--------|--------------|
-| **VS Code Copilot** | Already preconfigured in `.vscode/mcp.json` — just start the Docker container |
+| **VS Code Copilot** | Already preconfigured in `.vscode/mcp.json` - just start the Docker container |
 | **Claude Desktop** | Add to `claude_desktop_config.json` as remote MCP server |
 | **OpenAI Responses API** | Use as remote MCP server URL |
 
@@ -292,7 +292,7 @@ The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://local
 
 6. **Add integration tests** in `Tests/Integration/`
 
-7. **Done** — `WithToolsFromAssembly()` auto-discovers the new tool. No routing changes.
+7. **Done** - `WithToolsFromAssembly()` auto-discovers the new tool. No routing changes.
 
 ---
 
@@ -311,8 +311,8 @@ The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://local
 
 - **Unit tests** cover tool logic, input validation, and DTO mapping in isolation
 - **Integration tests** spin up an in-memory host via `WebApplicationFactory<Program>`
-- **All external APIs are mocked** — zero real network calls in the test suite
-- **TDD preferred** — Red → Green → Refactor
+- **All external APIs are mocked** - zero real network calls in the test suite
+- **TDD preferred** - Red → Green → Refactor
 
 ### Run Tests
 
@@ -338,7 +338,7 @@ This template ships with **4 GitHub Actions workflows**, all following security 
 **File:** `.github/workflows/build-and-test.yml`  
 **Triggers:** Push to `main`, Pull Request to `main`
 
-Runs `dotnet restore` → `dotnet build` → `dotnet test`. This is the primary CI gate — must pass before any PR can be merged.
+Runs `dotnet restore` → `dotnet build` → `dotnet test`. This is the primary CI gate - must pass before any PR can be merged.
 
 | Step | Command |
 |------|---------|
@@ -393,13 +393,13 @@ This template includes a comprehensive Copilot configuration that turns VS Code 
 
 ### Custom Agents
 
-Five specialist agents follow an **orchestrator pattern** — use the orchestrator for cross-domain tasks, or call specialists directly for single-domain work.
+Five specialist agents follow an **orchestrator pattern** - use the orchestrator for cross-domain tasks, or call specialists directly for single-domain work.
 
 | Agent | File | Purpose |
 |-------|------|---------|
 | **orchestrator** | `.github/agents/orchestrator.agent.md` | Plans, delegates, and reviews multi-step tasks. Has access to all tools and all subagents (`agents: ['*']`). Use for tasks spanning 2+ domains. |
 | **mcp-tool-creator** | `.github/agents/mcp-tool-creator.agent.md` | Scaffolds complete MCP tools: Tool class, Service, Models, DI registration, and test stubs. |
-| **test** | `.github/agents/test.agent.md` | TDD specialist — writes, fixes, and improves unit and integration tests. |
+| **test** | `.github/agents/test.agent.md` | TDD specialist - writes, fixes, and improves unit and integration tests. |
 | **security** | `.github/agents/security.agent.md` | Hardens GitHub Actions workflows, audits dependencies, checks for secrets exposure. |
 | **docs** | `.github/agents/docs.agent.md` | Creates and maintains PR/issue templates, developer documentation, and governance files. |
 
@@ -432,7 +432,7 @@ Detailed step-by-step guides that agents and prompts reference for domain-specif
 |-------|-----------|-------|-------------|
 | **MCP Tool Creation** | `.github/skills/mcp-tool-creation/` | 7 | Complete guide for adding a new MCP tool to the project |
 | **TDD for MCP** | `.github/skills/tdd-mcp/` | Multi-phase | Red/Green/Refactor workflow tailored to MCP tools |
-| **Actions Security** | `.github/skills/actions-security/` | 8 | Hardening GitHub Actions — SHA pinning, permissions, CodeQL, Dependabot |
+| **Actions Security** | `.github/skills/actions-security/` | 8 | Hardening GitHub Actions - SHA pinning, permissions, CodeQL, Dependabot |
 
 ### Hooks
 
@@ -466,10 +466,10 @@ Always-on context files that Copilot reads automatically:
 
 Automatically assigns reviewers based on file paths. The `@ADASK-B/platform` team is configured as the default owner for all files, with specific entries for:
 
-- `.github/` — CI/CD and configuration
-- `Tools/`, `Services/`, `Models/` — Application code
-- `Tests/` — Test code
-- `Dockerfile` — Container configuration
+- `.github/` - CI/CD and configuration
+- `Tools/`, `Services/`, `Models/` - Application code
+- `Tests/` - Test code
+- `Dockerfile` - Container configuration
 
 ### Pull Request Template
 
@@ -477,10 +477,10 @@ Automatically assigns reviewers based on file paths. The `@ADASK-B/platform` tea
 
 Every PR is pre-populated with a structured checklist covering:
 
-- **Code Quality** — Conventions, English-only, conventional commits
-- **MCP Tools** — Descriptions, validation, error handling, CancellationToken
-- **Testing** — Unit tests, integration tests, mocked HTTP, green test suite
-- **Security** — No secrets, no TODO placeholders, trusted dependencies
+- **Code Quality** - Conventions, English-only, conventional commits
+- **MCP Tools** - Descriptions, validation, error handling, CancellationToken
+- **Testing** - Unit tests, integration tests, mocked HTTP, green test suite
+- **Security** - No secrets, no TODO placeholders, trusted dependencies
 
 ### Issue Templates
 
@@ -500,14 +500,14 @@ Every PR is pre-populated with a structured checklist covering:
 | Port | 8080 |
 | User | Non-root (`USER $APP_UID`) |
 | Build | Multi-stage (SDK excluded from final image) |
-| State | Stateless — no volumes, no persistent storage |
+| State | Stateless - no volumes, no persistent storage |
 
 The Dockerfile uses a multi-stage build:
 
-1. **base** — ASP.NET runtime, non-root user, port 8080
-2. **build** — SDK image, restores and compiles the project
-3. **publish** — Publishes the project for release
-4. **final** — Copies published output into the base image
+1. **base** - ASP.NET runtime, non-root user, port 8080
+2. **build** - SDK image, restores and compiles the project
+3. **publish** - Publishes the project for release
+4. **final** - Copies published output into the base image
 
 ---
 
@@ -517,22 +517,22 @@ This template enforces security at multiple levels:
 
 ### Code Level
 - **Input validation** on all MCP tool parameters before use
-- **No secrets in code** — use environment variables or secrets managers
-- **Structured logging** — never log tokens, passwords, or sensitive request bodies
-- **Error handling** — wrap external API calls, never leak raw exceptions to MCP clients
+- **No secrets in code** - use environment variables or secrets managers
+- **Structured logging** - never log tokens, passwords, or sensitive request bodies
+- **Error handling** - wrap external API calls, never leak raw exceptions to MCP clients
 
 ### Container Level
 - **Non-root execution** (`USER $APP_UID`)
-- **Multi-stage builds** — SDK and build tools excluded from the final image
-- **No secrets in images** — environment variables only
-- **Plain HTTP** — TLS terminated at PaaS/ingress, not in the container
+- **Multi-stage builds** - SDK and build tools excluded from the final image
+- **No secrets in images** - environment variables only
+- **Plain HTTP** - TLS terminated at PaaS/ingress, not in the container
 
 ### CI/CD Level
-- **SHA-pinned actions** — all GitHub Actions use full commit SHAs, not mutable tags
-- **Least-privilege permissions** — `permissions: {}` at workflow level, scoped per job
-- **CodeQL SAST** — weekly and on every PR
-- **Dependency Review** — blocks PRs with vulnerable dependencies (severity ≥ moderate)
-- **Dependabot** — weekly automated dependency updates for NuGet and Actions
+- **SHA-pinned actions** - all GitHub Actions use full commit SHAs, not mutable tags
+- **Least-privilege permissions** - `permissions: {}` at workflow level, scoped per job
+- **CodeQL SAST** - weekly and on every PR
+- **Dependency Review** - blocks PRs with vulnerable dependencies (severity ≥ moderate)
+- **Dependabot** - weekly automated dependency updates for NuGet and Actions
 
 ### Supply Chain
 - **Dependabot** monitors NuGet packages and GitHub Actions for vulnerabilities
@@ -545,12 +545,12 @@ This template enforces security at multiple levels:
 
 | Concept | Details |
 |---------|---------|
-| **Endpoint** | `POST /mcp` — JSON-RPC over Streamable HTTP |
+| **Endpoint** | `POST /mcp` - JSON-RPC over Streamable HTTP |
 | **Transport** | Streamable HTTP (`WithHttpTransport` + `MapMcp`) |
 | **Tool Discovery** | `WithToolsFromAssembly()` scans for `[McpServerToolType]` classes |
 | **Tool Invocation** | `[McpServerTool]` methods are called by the SDK on `tools/call` |
 | **Parameter Schema** | Auto-generated from `[Description]` attributes |
-| **Health Probe** | `GET /health` — custom endpoint for container orchestration (not part of MCP spec) |
+| **Health Probe** | `GET /health` - custom endpoint for container orchestration (not part of MCP spec) |
 | **Compatible Clients** | OpenAI Responses API, Claude Desktop, VS Code Copilot, and any MCP client |
 
 ### Resources
@@ -578,7 +578,7 @@ This template enforces security at multiple levels:
    dotnet build --configuration Release --no-restore
    dotnet test --configuration Release --no-build --verbosity normal
    ```
-5. Push and open a PR — the PR template checklist will guide you through the review
+5. Push and open a PR - the PR template checklist will guide you through the review
 
 ### Commit Convention
 
@@ -594,10 +594,10 @@ docs: update README with new tool guide
 
 ### PR Guidelines
 
-- **Small, focused PRs** — one tool, one bug fix, or one refactoring per PR
-- **Clear descriptions** — what changed, why, and how to verify
-- **Example tool calls** — include request/response examples for new MCP tools
-- **All checks must pass** — Build, CodeQL, Dependency Review
+- **Small, focused PRs** - one tool, one bug fix, or one refactoring per PR
+- **Clear descriptions** - what changed, why, and how to verify
+- **Example tool calls** - include request/response examples for new MCP tools
+- **All checks must pass** - Build, CodeQL, Dependency Review
 
 ---
 
