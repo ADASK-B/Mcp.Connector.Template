@@ -43,7 +43,7 @@ public class OpenMeteoServiceTests
         // Assert
         result.Should().NotBeNull();
         result.Timezone.Should().Be("America/New_York");
-        result.Current.TemperatureCelsius.Should().Be(5.2);
+        result.Current.Temperature.Should().Be(5.2);
         result.Current.WindSpeedKmh.Should().Be(12.3);
         result.Current.RelativeHumidityPercent.Should().Be(65);
         result.CurrentUnits.Temperature.Should().Be("°C");

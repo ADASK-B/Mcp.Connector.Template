@@ -46,7 +46,6 @@ Create `Services/<ApiName>Service.cs` that wraps the external HTTP API.
 
 **Pattern:**
 ```csharp
-using System.Net.Http.Json;
 using Mcp.Connector.Template.Models;
 
 namespace Mcp.Connector.Template.Services;

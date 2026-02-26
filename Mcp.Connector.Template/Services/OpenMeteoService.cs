@@ -8,7 +8,6 @@
 // Docs: https://open-meteo.com/en/docs
 // -----------------------------------------------------------------------
 
-using System.Net.Http.Json;
 using Mcp.Connector.Template.Models;
 
 namespace Mcp.Connector.Template.Services;

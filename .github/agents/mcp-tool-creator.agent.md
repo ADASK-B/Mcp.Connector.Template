@@ -51,7 +51,6 @@ public static class {ToolName}Tool
 
 ### 2. `Services/{ApiName}Service.cs`
 ```csharp
-using System.Net.Http.Json;
 using Mcp.Connector.Template.Models;
 
 namespace Mcp.Connector.Template.Services;
