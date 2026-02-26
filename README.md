@@ -70,23 +70,22 @@ The template ships with a **fully working example** - an MCP tool that wraps the
 
 | Component | File | Description |
 |-----------|------|-------------|
-| **Tool** | `Tools/WeatherTool.cs` | `getWeather` - returns current weather for a city |
+| **Tool** | `Tools/WeatherTool.cs` | `getWeather` - returns current weather for given coordinates |
 | **Service** | `Services/OpenMeteoService.cs` | HTTP client wrapper for the Open-Meteo REST API |
-| **Models** | `Models/WeatherModels.cs` | API response DTOs + clean result record for the LLM |
-
-**Supported cities:** New York, London, Berlin, Tokyo, Sydney, Paris, Vienna, Zurich.
+| **Models** | `Models/WeatherModels.cs` | API response DTOs (records) |
 
 **Example interaction:**
 ```
 User:  "What's the weather in Berlin?"
-LLM:   → calls getWeather("Berlin")
+LLM:   → resolves Berlin to 52.52, 13.41
+       → calls getWeather(latitude: 52.52, longitude: 13.41)
 Tool:  → fetches from api.open-meteo.com
 LLM:   "It's currently 8.3°C in Berlin with 72% humidity and 15 km/h wind."
 ```
 
-**Response fields:** City, TemperatureCelsius, TemperatureFahrenheit, HumidityPercent, WindSpeedKmh, Timezone, MeasuredAt.
+**Response fields:** Latitude, Longitude, Timezone, Temperature, WindSpeedKmh, RelativeHumidityPercent, CurrentUnits.
 
-This example demonstrates the full pattern: input validation, error handling, temperature conversion, `CancellationToken` forwarding, and corresponding unit + integration tests. Use it as a reference when adding your own tools.
+This example demonstrates the full pattern: input validation, error handling, `CancellationToken` forwarding, and corresponding unit + integration tests. Use it as a reference when adding your own tools.
 
 ---
 
@@ -257,16 +256,16 @@ The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://local
 
    ```csharp
    [McpServerToolType]
-   public static class WeatherTool
+   public static class JiraTool
    {
-       [McpServerTool(Name = "getWeather"), Description("Get current weather for a city")]
-       public static async Task<string> GetWeather(
-           WeatherService weatherService,
-           [Description("City name, e.g. 'Berlin'")] string city,
+       [McpServerTool(Name = "listIssues"), Description("Lists Jira issues for a project")]
+       public static async Task<string> ListIssues(
+           JiraService jiraService,
+           [Description("Jira project key, e.g. 'PROJ'")] string projectKey,
            CancellationToken cancellationToken)
        {
-           ArgumentException.ThrowIfNullOrWhiteSpace(city);
-           var result = await weatherService.GetCurrentAsync(city, cancellationToken);
+           ArgumentException.ThrowIfNullOrWhiteSpace(projectKey);
+           var result = await jiraService.GetIssuesAsync(projectKey, cancellationToken);
            return JsonSerializer.Serialize(result);
        }
    }
@@ -276,7 +275,7 @@ The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://local
 
 3. **Create Models** in `Models/<Domain>Models.cs` (record types for DTOs)
 
-4. **Register DI** in `Program.cs`: `builder.Services.AddHttpClient<WeatherService>();`
+4. **Register DI** in `Program.cs`: `builder.Services.AddHttpClient<JiraService>();`
 
 5. **Add unit tests** in `Tests/Unit/<Name>ToolTests.cs`
 
@@ -432,14 +431,15 @@ VS Code Copilot hooks that run automatically during agent interactions to enforc
 |------|------|---------|---------|
 | **Build Check** | `.github/hooks/build-check.json` | Agent Stop | Runs `dotnet build` after code generation to catch compile errors immediately |
 | **Test Nudge** | `.github/hooks/test-nudge.json` | Agent Stop | Scans for Tool/Service classes without corresponding unit test files. Blocks the agent and requests test creation if coverage gaps are found. |
+| **README Check** | `.github/hooks/readme-check.json` | Session Start | Verifies README.md is in sync with the codebase — file references, counted items (workflows, agents, prompts, skills, hooks), and test count. |
 
 The Test Nudge hook uses OS-specific scripts:
 - **Windows:** `.github/hooks/scripts/check-missing-tests.ps1` (PowerShell 5.1 compatible)
 - **Linux/macOS:** `.github/hooks/scripts/check-missing-tests.sh` (Bash)
 
-### Instruction Files
-
-Always-on context files that Copilot reads automatically:
+The README Check hook uses OS-specific scripts:
+- **Windows:** `.github/hooks/scripts/check-readme-freshness.ps1` (PowerShell 5.1 compatible)
+- **Linux/macOS:** `.github/hooks/scripts/check-readme-freshness.sh` (Bash)
 
 | File | Scope | Purpose |
 |------|-------|---------|

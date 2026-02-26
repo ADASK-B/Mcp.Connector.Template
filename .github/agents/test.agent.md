@@ -37,7 +37,7 @@ Mcp.Connector.Template.Tests/
 - **Framework**: xUnit with `[Fact]` and `[Theory]` attributes
 - **Assertions**: FluentAssertions (`result.Should().NotBeNull()`, `response.StatusCode.Should().Be(HttpStatusCode.OK)`)
 - **Mocking**: Mock external HTTP via custom `HttpMessageHandler` — never use a mocking framework for `HttpClient`
-- **Naming**: `MethodName_Scenario_ExpectedResult` (e.g. `GetWeather_ValidCity_ReturnsTemperature`)
+- **Naming**: `MethodName_Scenario_ExpectedResult` (e.g. `GetWeather_ValidCoordinates_ReturnsWeatherResult`)
 - **No real HTTP calls**: All external APIs must be mocked. Zero network calls in the test suite.
 - **CancellationToken**: Always pass `CancellationToken.None` in tests (or a linked token for timeout tests)
 
