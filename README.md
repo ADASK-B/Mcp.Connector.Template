@@ -55,7 +55,7 @@ This template provides the complete scaffolding for an MCP connector service:
 - **5 custom Copilot agents** with orchestrator pattern for AI-assisted development
 - **6 prompt files** for common development workflows
 - **3 skill guides** with step-by-step instructions for tools, TDD, and security hardening
-- **2 Copilot hooks** for automatic build verification and test coverage enforcement
+- **Copilot hooks** for automatic build verification and test coverage enforcement
 - **Dependabot** for automated dependency updates (NuGet + GitHub Actions)
 - **CodeQL** for static application security testing (SAST)
 - **Pull request template**, issue templates, and CODEOWNERS for governance

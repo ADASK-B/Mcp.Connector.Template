@@ -20,6 +20,12 @@ public class FakeOpenMeteoHandler : HttpMessageHandler
     private readonly string _responseBody;
 
     /// <summary>
+    /// The last request URI received by this handler. Useful for verifying
+    /// that the service builds the correct URL.
+    /// </summary>
+    public Uri? LastRequestUri { get; private set; }
+
+    /// <summary>
     /// Creates a handler that always returns the given status code and body.
     /// </summary>
     public FakeOpenMeteoHandler(HttpStatusCode statusCode, string responseBody)
@@ -32,6 +38,8 @@ public class FakeOpenMeteoHandler : HttpMessageHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
+        LastRequestUri = request.RequestUri;
+
         var response = new HttpResponseMessage(_statusCode)
         {
             Content = new StringContent(_responseBody, Encoding.UTF8, "application/json")

@@ -1,0 +1,16 @@
+{
+	"hooks": {
+		// At the start of every Copilot session, verify that README.md
+		// reflects the current codebase: file references, test count,
+		// and counted items (workflows, agents, prompts, skills, hooks).
+		// If anything is stale, the agent is told to update README first.
+		"Start": [
+			{
+				"type": "command",
+				"windows": "powershell -ExecutionPolicy Bypass -File .github/hooks/scripts/check-readme-freshness.ps1",
+				"command": "bash .github/hooks/scripts/check-readme-freshness.sh",
+				"timeout": 30
+			}
+		]
+	}
+}

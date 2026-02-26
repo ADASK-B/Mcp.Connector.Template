@@ -12,6 +12,7 @@
 
 using System.ComponentModel;
 using System.Text.Json;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using Mcp.Connector.Template.Services;
 
@@ -30,10 +31,16 @@ public static class WeatherTool
         "The response includes temperature, humidity, wind speed, timezone, and units.")]
     public static async Task<string> GetWeather(
         OpenMeteoService weatherService,
-        double latitude,
-        double longitude,
+        [Description("Latitude in decimal degrees, e.g. 52.52 for Berlin. Must be between -90 and 90.")] double latitude,
+        [Description("Longitude in decimal degrees, e.g. 13.41 for Berlin. Must be between -180 and 180.")] double longitude,
         CancellationToken cancellationToken)
     {
+        if (double.IsNaN(latitude) || double.IsInfinity(latitude) || latitude < -90 || latitude > 90)
+            throw new McpException($"Latitude must be between -90 and 90, got {latitude}.");
+
+        if (double.IsNaN(longitude) || double.IsInfinity(longitude) || longitude < -180 || longitude > 180)
+            throw new McpException($"Longitude must be between -180 and 180, got {longitude}.");
+
         try
         {
             var response = await weatherService.GetCurrentWeatherAsync(

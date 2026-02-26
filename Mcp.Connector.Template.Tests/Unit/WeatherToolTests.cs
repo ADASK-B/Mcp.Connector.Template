@@ -12,6 +12,7 @@ using Mcp.Connector.Template.Models;
 using Mcp.Connector.Template.Services;
 using Mcp.Connector.Template.Tests.TestInfrastructure;
 using Mcp.Connector.Template.Tools;
+using ModelContextProtocol;
 
 namespace Mcp.Connector.Template.Tests.Unit;
 
@@ -58,5 +59,37 @@ public class WeatherToolTests
 
         json.Should().Contain("error");
         json.Should().Contain("Failed to fetch weather data");
+    }
+
+    // -----------------------------------------------------------------------
+    //  Input validation
+    // -----------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(-91)]
+    [InlineData(91)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public async Task GetWeather_InvalidLatitude_ThrowsMcpException(double latitude)
+    {
+        var service = CreateService(FakeOpenMeteoHandler.WithSuccessResponse());
+
+        var act = () => WeatherTool.GetWeather(service, latitude, 13.41, CancellationToken.None);
+
+        await act.Should().ThrowAsync<McpException>();
+    }
+
+    [Theory]
+    [InlineData(-181)]
+    [InlineData(181)]
+    [InlineData(double.NaN)]
+    [InlineData(double.NegativeInfinity)]
+    public async Task GetWeather_InvalidLongitude_ThrowsMcpException(double longitude)
+    {
+        var service = CreateService(FakeOpenMeteoHandler.WithSuccessResponse());
+
+        var act = () => WeatherTool.GetWeather(service, 52.52, longitude, CancellationToken.None);
+
+        await act.Should().ThrowAsync<McpException>();
     }
 }

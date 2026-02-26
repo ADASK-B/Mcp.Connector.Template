@@ -76,4 +76,29 @@ public class OpenMeteoServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*null*");
     }
+
+    // -----------------------------------------------------------------------
+    //  URL construction
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetCurrentWeatherAsync_BuildsCorrectUrl()
+    {
+        // Arrange
+        var handler = FakeOpenMeteoHandler.WithSuccessResponse();
+        var service = CreateService(handler);
+
+        // Act
+        await service.GetCurrentWeatherAsync(52.52, 13.41, CancellationToken.None);
+
+        // Assert — verify the handler received the expected URL
+        handler.LastRequestUri.Should().NotBeNull();
+        var url = handler.LastRequestUri!.ToString();
+        url.Should().Contain("latitude=52.52");
+        url.Should().Contain("longitude=13.41");
+        url.Should().Contain("temperature_2m");
+        url.Should().Contain("wind_speed_10m");
+        url.Should().Contain("relative_humidity_2m");
+        url.Should().Contain("timezone=auto");
+    }
 }

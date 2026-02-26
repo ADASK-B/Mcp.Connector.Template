@@ -8,6 +8,7 @@
 // Docs: https://open-meteo.com/en/docs
 // -----------------------------------------------------------------------
 
+using System.Globalization;
 using Mcp.Connector.Template.Models;
 
 namespace Mcp.Connector.Template.Services;
@@ -41,7 +42,10 @@ public class OpenMeteoService
         CancellationToken cancellationToken)
     {
         // Build the query — request current temperature, wind speed, and humidity.
-        var url = $"/v1/forecast?latitude={latitude}&longitude={longitude}"
+        // Use InvariantCulture to ensure decimal dots (not commas) in the URL.
+        var lat = latitude.ToString(CultureInfo.InvariantCulture);
+        var lon = longitude.ToString(CultureInfo.InvariantCulture);
+        var url = $"/v1/forecast?latitude={lat}&longitude={lon}"
                 + "&current=temperature_2m,wind_speed_10m,relative_humidity_2m"
                 + "&timezone=auto";
 
