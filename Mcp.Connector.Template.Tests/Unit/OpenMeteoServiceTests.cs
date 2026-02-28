@@ -5,6 +5,7 @@
 //   • Successful API response → correct deserialization of all fields
 //   • API server error → HttpRequestException is thrown
 //   • Null response body → InvalidOperationException is thrown
+//   • URL construction → query parameters are built correctly
 // -----------------------------------------------------------------------
 
 using System.Net;

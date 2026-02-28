@@ -17,7 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ---------------------------------------------------------------------------
 //  Register external API services via IHttpClientFactory.
-//  Each service gets its own named HttpClient with independent settings.
+//  Each service gets its own typed HttpClient with independent settings.
 // ---------------------------------------------------------------------------
 builder.Services.AddHttpClient<OpenMeteoService>(client =>
 {
