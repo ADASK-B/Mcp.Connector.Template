@@ -11,6 +11,7 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+COPY ["Directory.Build.props", "./"]
 COPY ["Mcp.Connector.Template/Mcp.Connector.Template.csproj", "Mcp.Connector.Template/"]
 RUN dotnet restore "./Mcp.Connector.Template/Mcp.Connector.Template.csproj"
 COPY . .

@@ -20,13 +20,12 @@ public class OpenMeteoService
 {
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Initializes the service with an <see cref="HttpClient"/> configured via DI.
+    /// </summary>
     public OpenMeteoService(HttpClient httpClient)
     {
         _httpClient = httpClient;
-
-        // Set the base address once; IHttpClientFactory may reuse the handler.
-        _httpClient.BaseAddress ??= new Uri("https://api.open-meteo.com");
-        _httpClient.Timeout = TimeSpan.FromSeconds(10);
     }
 
     /// <summary>

@@ -43,7 +43,11 @@ Program.cs contains **only** hosting, DI registration, and endpoint mapping:
 var builder = WebApplication.CreateBuilder(args);
 
 // Register external API service clients via HttpClientFactory
-builder.Services.AddHttpClient<MyExternalApiService>();
+builder.Services.AddHttpClient<MyExternalApiService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.example.com");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 // Register MCP server with HTTP transport + auto-discover tools
 builder.Services.AddMcpServer()
@@ -89,7 +93,8 @@ public static class MyTool
 
 ### Services (External API Clients)
 - External API calls go into dedicated service classes in `Services/`
-- Register via `IHttpClientFactory` / `builder.Services.AddHttpClient<T>()`
+- Register via `IHttpClientFactory` / `builder.Services.AddHttpClient<T>()` in Program.cs
+- Configure `BaseAddress` and `Timeout` in the `AddHttpClient` delegate in Program.cs, not inside the service constructor
 - Never use `new HttpClient()` directly
 - Always accept `CancellationToken`
 - Handle HTTP errors internally — return meaningful results or throw
@@ -142,8 +147,7 @@ Mcp.Connector.Template.Tests/
 
 - Base image: `mcr.microsoft.com/dotnet/aspnet:10.0`
 - Build image: `mcr.microsoft.com/dotnet/sdk:10.0`
-- `EXPOSE 8080`
-- `ENV ASPNETCORE_URLS=http://+:8080`
+- `EXPOSE 8080` (.NET 10+ defaults to port 8080 for non-root containers)
 - Non-root user via `USER $APP_UID`
 - No local state, no volumes, no persistent storage
 - OCI labels for `org.opencontainers.image.source` and `org.opencontainers.image.revision`

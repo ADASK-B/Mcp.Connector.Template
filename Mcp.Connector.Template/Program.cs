@@ -17,9 +17,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ---------------------------------------------------------------------------
 //  Register external API services via IHttpClientFactory.
-//  Each service gets its own named HttpClient with independent settings.
+//  Each service gets its own typed HttpClient with independent settings.
 // ---------------------------------------------------------------------------
-builder.Services.AddHttpClient<OpenMeteoService>();
+builder.Services.AddHttpClient<OpenMeteoService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.open-meteo.com");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 // ---------------------------------------------------------------------------
 //  Register the MCP server with Streamable HTTP transport.
@@ -35,7 +39,10 @@ var app = builder.Build();
 
 // ---------------------------------------------------------------------------
 //  Health probe — used by container orchestration (Docker, Kubernetes, Azure).
-//  This is NOT part of the MCP spec, just a standard liveness check.
+//  This is a liveness check (always returns 200 if the process is running).
+//  For readiness checks that verify external dependencies, consider adding
+//  a separate /ready endpoint using ASP.NET Core Health Checks:
+//  https://learn.microsoft.com/aspnet/core/host-and-deploy/health-checks
 // ---------------------------------------------------------------------------
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 

@@ -41,3 +41,24 @@ mcp-session-id: {{$dotenv MCP_SESSION_ID}}
 }
 
 ###
+
+### MCP tools/call — invoke getWeather for Berlin (52.52, 13.41)
+POST {{Mcp.Connector.Template_HostAddress}}/mcp
+Content-Type: application/json
+Accept: application/json, text/event-stream
+mcp-session-id: {{$dotenv MCP_SESSION_ID}}
+
+{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tools/call",
+    "params": {
+        "name": "getWeather",
+        "arguments": {
+            "latitude": 52.52,
+            "longitude": 13.41
+        }
+    }
+}
+
+###
