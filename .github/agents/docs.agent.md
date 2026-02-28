@@ -39,7 +39,7 @@ You are a **Documentation Specialist Agent** for the Mcp.Connector.Template repo
 
 ## Project Context
 
-- **Stack**: .NET 10, C# 13, ASP.NET Core, MCP C# SDK
+- **Stack**: .NET 10, C# 14, ASP.NET Core, MCP C# SDK
 - **Test command**: `dotnet test --configuration Release --verbosity normal`
 - **Build command**: `dotnet build --configuration Release`
 - **Container**: Docker, GHCR, port 8080

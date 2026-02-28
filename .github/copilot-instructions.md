@@ -8,7 +8,7 @@ New connectors are created by cloning this template and adding tool/service/mode
 
 ## Tech Stack
 
-- **.NET 10** (LTS), C# 13, Minimal API — no controllers
+- **.NET 10** (LTS), C# 14, Minimal API — no controllers
 - **MCP C# SDK**: `ModelContextProtocol.AspNetCore` NuGet package (Streamable HTTP transport)
 - **Container-first**: Linux Docker image, port **8080**, `ASPNETCORE_URLS=http://+:8080`
 - **Testing**: xUnit, `Microsoft.AspNetCore.Mvc.Testing` (WebApplicationFactory), FluentAssertions
@@ -132,7 +132,7 @@ Mcp.Connector.Template.Tests/
 
 ## Coding Conventions
 
-- **Language**: C# 13, file-scoped namespaces, nullable reference types enabled
+- **Language**: C# 14, file-scoped namespaces, nullable reference types enabled
 - **English only**: All code, comments, commit messages, tool descriptions, parameter descriptions, log messages, and documentation **must** be written in English
 - **Naming**: PascalCase for public members; suffix `Tool` for tool classes, `Service` for HTTP client wrappers
 - **Async**: All I/O methods are `async Task<T>`, always pass `CancellationToken`
