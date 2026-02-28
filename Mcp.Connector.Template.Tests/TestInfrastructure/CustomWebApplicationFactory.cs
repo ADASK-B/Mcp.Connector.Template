@@ -24,7 +24,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             // Replace the OpenMeteoService's HttpClient handler with a fake.
             // This ensures zero real HTTP calls during integration tests.
-            services.AddHttpClient<OpenMeteoService>()
+            // We must also configure BaseAddress and Timeout to match Program.cs,
+            // otherwise GetAsync with relative URLs will fail.
+            services.AddHttpClient<OpenMeteoService>(client =>
+                {
+                    client.BaseAddress = new Uri("https://api.open-meteo.com");
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                })
                 .ConfigurePrimaryHttpMessageHandler(() => FakeOpenMeteoHandler.WithSuccessResponse());
         });
     }
