@@ -21,7 +21,7 @@ indent_size = 2
 trim_trailing_whitespace = false
 
 [*.cs]
-# File-scoped namespaces (C# 13 convention)
+# File-scoped namespaces (C# 10+ convention)
 csharp_style_namespace_declarations = file_scoped:warning
 
 # Use 'var' when the type is apparent
