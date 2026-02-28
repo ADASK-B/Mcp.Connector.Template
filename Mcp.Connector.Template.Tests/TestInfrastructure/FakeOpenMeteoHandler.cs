@@ -34,6 +34,7 @@ public class FakeOpenMeteoHandler : HttpMessageHandler
         _responseBody = responseBody;
     }
 
+    /// <inheritdoc />
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)

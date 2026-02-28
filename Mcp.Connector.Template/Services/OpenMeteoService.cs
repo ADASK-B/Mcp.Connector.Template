@@ -20,6 +20,9 @@ public class OpenMeteoService
 {
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Initializes the service with an <see cref="HttpClient"/> configured via DI.
+    /// </summary>
     public OpenMeteoService(HttpClient httpClient)
     {
         _httpClient = httpClient;
