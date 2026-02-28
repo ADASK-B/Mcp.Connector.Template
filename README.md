@@ -93,7 +93,7 @@ This example demonstrates the full pattern: input validation, error handling, `C
 
 | Component | Technology |
 |-----------|-----------|
-| Runtime | .NET 10 (LTS), C# 13 |
+| Runtime | .NET 10 (LTS), C# 14 |
 | Framework | ASP.NET Core Minimal API - no controllers |
 | MCP SDK | [`ModelContextProtocol.AspNetCore`](https://github.com/modelcontextprotocol/csharp-sdk) (Streamable HTTP) |
 | Container | Docker multi-stage, Linux, port 8080 |
@@ -143,6 +143,11 @@ graph TD
 Mcp.Connector.Template/
 ├── README.md                              # ← You are here
 ├── Mcp.Connector.Template.slnx           # Solution file
+├── Directory.Build.props                 # Global build settings (TFM, nullable, warnings)
+├── .editorconfig                          # Code style and formatting rules
+│
+├── .vscode/
+│   └── mcp.json                          # VS Code Copilot MCP server configuration
 │
 ├── Mcp.Connector.Template/               # Main application project
 │   ├── Program.cs                        # Host, DI, endpoints (MapMcp + /health)
@@ -440,6 +445,8 @@ The Test Nudge hook uses OS-specific scripts:
 The README Check hook uses OS-specific scripts:
 - **Windows:** `.github/hooks/scripts/check-readme-freshness.ps1` (PowerShell 5.1 compatible)
 - **Linux/macOS:** `.github/hooks/scripts/check-readme-freshness.sh` (Bash)
+
+### Instruction Files
 
 | File | Scope | Purpose |
 |------|-------|---------|
