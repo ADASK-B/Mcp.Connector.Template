@@ -3,7 +3,9 @@
 //
 // Tests cover:
 //   • Valid coordinates → correct JSON result from API
+//   • Boundary values → edge-case coordinates are accepted
 //   • API failure → error JSON instead of unhandled exception
+//   • Input validation → invalid coordinates throw McpException
 // -----------------------------------------------------------------------
 
 using System.Text.Json;
@@ -59,6 +61,25 @@ public class WeatherToolTests
 
         json.Should().Contain("error");
         json.Should().Contain("Failed to fetch weather data");
+    }
+
+    // -----------------------------------------------------------------------
+    //  Boundary values — valid edge-case coordinates must be accepted
+    // -----------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(-90, -180)]
+    [InlineData(90, 180)]
+    [InlineData(0, 0)]
+    [InlineData(-90, 0)]
+    [InlineData(0, 180)]
+    public async Task GetWeather_BoundaryCoordinates_DoesNotThrow(double latitude, double longitude)
+    {
+        var service = CreateService(FakeOpenMeteoHandler.WithSuccessResponse());
+
+        var json = await WeatherTool.GetWeather(service, latitude, longitude, CancellationToken.None);
+
+        json.Should().NotBeNullOrWhiteSpace();
     }
 
     // -----------------------------------------------------------------------

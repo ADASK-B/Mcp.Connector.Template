@@ -23,10 +23,6 @@ public class OpenMeteoService
     public OpenMeteoService(HttpClient httpClient)
     {
         _httpClient = httpClient;
-
-        // Set the base address once; IHttpClientFactory may reuse the handler.
-        _httpClient.BaseAddress ??= new Uri("https://api.open-meteo.com");
-        _httpClient.Timeout = TimeSpan.FromSeconds(10);
     }
 
     /// <summary>

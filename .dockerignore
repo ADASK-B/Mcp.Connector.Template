@@ -23,6 +23,9 @@
 **/values.dev.yaml
 LICENSE
 README.md
+.editorconfig
+.github
+Mcp.Connector.Template.Tests
 !**/.gitignore
 !.git/HEAD
 !.git/config

@@ -78,7 +78,15 @@ if (input.Length > 100)
 ### External API Clients
 - Place in `Services/` directory, suffix with `Service` (e.g. `MyApiService.cs`)
 - Accept `HttpClient` via constructor (injected by `IHttpClientFactory`)
-- Register in Program.cs: `builder.Services.AddHttpClient<MyApiService>()`
+- Register in Program.cs with `BaseAddress` and `Timeout` configured in the delegate:
+  ```csharp
+  builder.Services.AddHttpClient<MyApiService>(client =>
+  {
+      client.BaseAddress = new Uri("https://api.example.com");
+      client.Timeout = TimeSpan.FromSeconds(10);
+  });
+  ```
+- The service constructor should only store the injected `HttpClient` — no configuration
 - Always accept `CancellationToken` in async methods
 - Handle HTTP errors internally with try/catch
 
