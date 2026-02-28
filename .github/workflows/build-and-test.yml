@@ -1,3 +1,4 @@
+---
 name: Build and Test
 
 on:
@@ -14,6 +15,10 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -22,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309 # v5.1.0
+        uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309  # v5.1.0
         with:
           dotnet-version: '10.0.x'
 
@@ -36,4 +41,17 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test --no-build --configuration Release --verbosity normal
+        run: >-
+          dotnet test --no-build --configuration Release --verbosity normal
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Generate coverage report
+        if: always()
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool
+          reportgenerator \
+            -reports:./TestResults/**/coverage.cobertura.xml \
+            -targetdir:./TestResults/CoverageReport \
+            -reporttypes:MarkdownSummaryGithub
+          cat ./TestResults/CoverageReport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
