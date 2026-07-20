@@ -69,6 +69,16 @@ jobs:
           grep -Fq 'flavor: latest=false' "$release_workflow"
           grep -Fq 'limit-severities-for-sarif: true' "$release_workflow"
           grep -Fq 'continue-on-error: true' "$release_workflow"
+          grep -Fq 'SCAN_PREDICATE_TYPE: https://adask-b.io/attestations/security-scan/v1' "$release_workflow"
+          # The next grep asserts a literal workflow variable reference.
+          # shellcheck disable=SC2016
+          test "$(grep -Fc 'cosign attest --yes --type "$SCAN_PREDICATE_TYPE"' "$release_workflow")" -eq 2
+          # The next grep asserts a literal workflow variable reference.
+          # shellcheck disable=SC2016
+          test "$(grep -Fc 'cosign verify-attestation --type "$SCAN_PREDICATE_TYPE"' "$release_workflow")" -eq 1
+          grep -Fq 'output: chart-trivy-results.sarif' "$release_workflow"
+          grep -Fq 'TRIVY_HELM_VALUES: release/trivy-chart-values.yaml' "$release_workflow"
+          grep -Fq 'output-file: chart-sbom.spdx.json' "$release_workflow"
           if grep -Eq '^[[:space:]]+push:[[:space:]]+true$' "$release_workflow"; then
             echo 'Release workflow must scan before publishing.' >&2
             exit 1
@@ -76,8 +86,10 @@ jobs:
           scan_line="$(grep -nF -- '- name: Scan immutable image' "$release_workflow" | cut -d: -f1)"
           publish_line="$(grep -nF -- '- name: Publish scanned immutable image' "$release_workflow" | cut -d: -f1)"
           sign_line="$(grep -nF -- '- name: Sign and attest published image' "$release_workflow" | cut -d: -f1)"
+          chart_scan_line="$(grep -nF -- '- name: Scan immutable Helm chart' "$release_workflow" | cut -d: -f1)"
           chart_line="$(grep -nF -- '- name: Publish immutable Helm chart' "$release_workflow" | cut -d: -f1)"
           test "$scan_line" -lt "$publish_line"
+          test "$chart_scan_line" -lt "$publish_line"
           test "$publish_line" -lt "$sign_line"
           test "$sign_line" -lt "$chart_line"
 

@@ -14,6 +14,7 @@ concurrency:
 env:
   IMAGE_REPOSITORY: ghcr.io/adask-b/mcp.connector.template
   CHART_REPOSITORY: ghcr.io/adask-b/mcp.connector.template/charts/mcp-connector
+  SCAN_PREDICATE_TYPE: https://adask-b.io/attestations/security-scan/v1
 
 jobs:
   publish:
@@ -121,6 +122,40 @@ jobs:
         uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98  # v4.32.6
         with:
           sarif_file: trivy-results.sarif
+          category: trivy/image
+
+      - name: Package immutable Helm chart
+        id: chart-package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-output
+          helm package charts/mcp-connector --destination release-output
+          path="release-output/mcp-connector-${{ steps.meta.outputs.version }}.tgz"
+          test -f "$path"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Scan immutable Helm chart
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # 0.35.0
+        env:
+          TRIVY_HELM_VALUES: release/trivy-chart-values.yaml
+        with:
+          scan-type: fs
+          scan-ref: charts/mcp-connector
+          format: sarif
+          output: chart-trivy-results.sarif
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          limit-severities-for-sarif: true
+          exit-code: '1'
+
+      - name: Mirror chart vulnerability evidence to GitHub Code Scanning
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98  # v4.32.6
+        with:
+          sarif_file: chart-trivy-results.sarif
+          category: trivy/chart
 
       - name: Generate image SBOM
         uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d  # v0
@@ -128,6 +163,14 @@ jobs:
           image: ${{ env.IMAGE_REPOSITORY }}:${{ steps.meta.outputs.version }}
           format: spdx-json
           output-file: sbom.spdx.json
+
+      - name: Generate chart SBOM
+        uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d  # v0
+        with:
+          file: ${{ steps.chart-package.outputs.path }}
+          format: spdx-json
+          output-file: chart-sbom.spdx.json
+          upload-artifact: false
 
       - name: Create deterministic provenance
         shell: bash
@@ -179,6 +222,7 @@ jobs:
           cosign sign --yes "$image"
           cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$image"
           cosign attest --yes --type slsaprovenance --predicate provenance.json "$image"
+          cosign attest --yes --type "$SCAN_PREDICATE_TYPE" --predicate trivy-results.sarif "$image"
 
       - name: Publish immutable Helm chart
         id: chart
@@ -187,9 +231,7 @@ jobs:
           set -euo pipefail
           printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
             helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-          mkdir -p release-output
-          helm package charts/mcp-connector --destination release-output
-          OUTPUT="$(helm push release-output/mcp-connector-*.tgz \
+          OUTPUT="$(helm push "${{ steps.chart-package.outputs.path }}" \
             oci://ghcr.io/adask-b/mcp.connector.template/charts 2>&1)"
           printf '%s\n' "$OUTPUT"
           DIGEST="$(printf '%s\n' "$OUTPUT" | awk '/Digest:/ {print $2}' | tail -1)"
@@ -204,7 +246,9 @@ jobs:
           set -euo pipefail
           chart="${CHART_REPOSITORY}@${CHART_DIGEST}"
           cosign sign --yes "$chart"
+          cosign attest --yes --type spdxjson --predicate chart-sbom.spdx.json "$chart"
           cosign attest --yes --type slsaprovenance --predicate provenance.json "$chart"
+          cosign attest --yes --type "$SCAN_PREDICATE_TYPE" --predicate chart-trivy-results.sarif "$chart"
 
       - name: Verify release and create manifest
         env:
@@ -218,6 +262,12 @@ jobs:
           for SUBJECT in "${IMAGE_REPOSITORY}@${IMAGE_DIGEST}" "${CHART_REPOSITORY}@${CHART_DIGEST}"; do
             cosign verify --certificate-identity "$IDENTITY" \
               --certificate-oidc-issuer "$ISSUER" "$SUBJECT"
+            cosign verify-attestation --type spdxjson --certificate-identity "$IDENTITY" \
+              --certificate-oidc-issuer "$ISSUER" "$SUBJECT" >/dev/null
+            cosign verify-attestation --type slsaprovenance --certificate-identity "$IDENTITY" \
+              --certificate-oidc-issuer "$ISSUER" "$SUBJECT" >/dev/null
+            cosign verify-attestation --type "$SCAN_PREDICATE_TYPE" --certificate-identity "$IDENTITY" \
+              --certificate-oidc-issuer "$ISSUER" "$SUBJECT" >/dev/null
           done
           python3 - <<'PY'
           import json
@@ -255,8 +305,10 @@ jobs:
           path: |
             release-manifest.json
             sbom.spdx.json
+            chart-sbom.spdx.json
             provenance.json
             trivy-results.sarif
+            chart-trivy-results.sarif
             release-output/*.tgz
           if-no-files-found: error
 
@@ -271,5 +323,6 @@ jobs:
             release_flags+=(--prerelease)
           fi
           gh release create "$GITHUB_REF_NAME" \
-            release-manifest.json sbom.spdx.json provenance.json \
+            release-manifest.json sbom.spdx.json chart-sbom.spdx.json provenance.json \
+            trivy-results.sarif chart-trivy-results.sarif \
             release-output/*.tgz "${release_flags[@]}"

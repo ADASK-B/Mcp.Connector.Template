@@ -346,21 +346,24 @@ Runs `dotnet restore` → `dotnet build` → `dotnet test`. This is the primary 
 **File:** `.github/workflows/release.yml`
 **Trigger:** reviewed SemVer tag (`v*`)
 
-Builds the multi-stage image locally, scans it before publication, emits an
-SPDX SBOM and provenance, and only then publishes and immediately signs the
-image and App-owned Helm chart in Publisher ingress F1. Both OCI digests are
-verified against the workflow's OIDC identity. The workflow never writes to a
-customer F2 registry and never publishes `latest`.
+Builds the multi-stage image locally, packages the App-owned Helm chart, and
+scans both before publication. It emits separate SPDX SBOMs plus provenance,
+then publishes and immediately signs both objects in Publisher ingress F1.
+Their SBOM, provenance and blocking scan results are signed OCI attestations;
+both digests and every required attestation are verified against the workflow's
+OIDC identity. The workflow never writes to customer F2 and never publishes
+`latest`.
 
-The SARIF report remains mandatory immutable release evidence. Its additional
-upload to GitHub Code Scanning is best-effort so a private-repository plan
-without that API cannot bypass or falsely fail the preceding blocking scan.
+The image and chart SARIF reports remain mandatory immutable release evidence.
+Their additional upload to GitHub Code Scanning is best-effort so a private-
+repository plan without that API cannot bypass or falsely fail either blocking
+scan.
 
 | Step | Action |
 |------|--------|
 | Validate | Exact tag, chart and release-input versions; .NET tests; Helm lint/render |
 | Publish | Image and Helm chart to `ghcr.io/adask-b/mcp.connector.template` (F1) |
-| Evidence | Trivy SARIF, SPDX SBOM, deterministic provenance and release manifest |
+| Evidence | Image/chart Trivy SARIF, separate SPDX SBOMs, deterministic provenance and release manifest |
 | Trust | Keyless Cosign signatures and verification against the exact workflow identity |
 | Delivery | A separate approved workflow promotes selected digests from F1 to customer F2b |
 
