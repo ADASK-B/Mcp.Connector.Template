@@ -74,4 +74,4 @@ jobs:
             -reports:./TestResults/**/coverage.cobertura.xml \
             -targetdir:./TestResults/CoverageReport \
             -reporttypes:MarkdownSummaryGithub
-          cat ./TestResults/CoverageReport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+          cat ./TestResults/CoverageReport/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
