@@ -12,7 +12,7 @@ New connectors are created by cloning this template and adding tool/service/mode
 - **MCP C# SDK**: `ModelContextProtocol.AspNetCore` NuGet package (Streamable HTTP transport)
 - **Container-first**: Linux Docker image, port **8080**, `ASPNETCORE_URLS=http://+:8080`
 - **Testing**: xUnit, `Microsoft.AspNetCore.Mvc.Testing` (WebApplicationFactory), FluentAssertions
-- **CI/CD**: GitHub Actions → build/test + Docker publish to GHCR
+- **CI/CD**: GitHub Actions → build/test + signed image/Helm release to Publisher F1; Approved Delivery alone writes customer F2b
 
 ## MCP C# SDK — Key Concepts
 

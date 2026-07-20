@@ -1,0 +1,30 @@
+replicaCount: 2
+
+image:
+  repository: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+service:
+  port: 8080
+
+route:
+  enabled: false
+  parentRef:
+    name: platform-gateway
+    namespace: gateway-system
+  hostname: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+networkPolicy:
+  ingressNamespaces:
+    - gateway-system
+    - monitoring
+  externalHttpsEgress: false

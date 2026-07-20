@@ -1,0 +1,226 @@
+---
+name: Publish signed MCP reference release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/adask-b/mcp.connector.template
+  CHART_REPOSITORY: ghcr.io/adask-b/mcp.connector.template/charts/mcp-connector
+
+jobs:
+  publish:
+    runs-on: ${{ vars.RELEASE_RUNNER || vars.RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309  # v5.1.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4  # v4
+        with:
+          version: v4.1.3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4.1.0
+
+      - name: Validate exact release contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$(sed -n 's/^version: //p' charts/mcp-connector/Chart.yaml)" = "$VERSION"
+          test "$(sed -n 's/^appVersion: "\(.*\)"/\1/p' charts/mcp-connector/Chart.yaml)" = "$VERSION"
+          test "$(python3 -c 'import json; print(json.load(open("release/release-input.json"))["version"])')" = "$VERSION"
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+          dotnet test --configuration Release --no-build --verbosity normal
+          helm lint charts/mcp-connector \
+            --set image.repository=registry.invalid/reference/mcp-connector \
+            --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          helm template mcp-reference charts/mcp-connector \
+            --set image.repository=registry.invalid/reference/mcp-connector \
+            --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            >/dev/null
+
+      - name: Log in to Publisher registry F1
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract immutable image metadata
+        id: meta
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf  # v6.0.0
+        with:
+          images: ${{ env.IMAGE_REPOSITORY }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,format=long
+
+      - name: Build and publish image
+        id: image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
+        with:
+          context: .
+          file: ./Mcp.Connector.Template/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan immutable image
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # 0.35.0
+        with:
+          image-ref: ${{ env.IMAGE_REPOSITORY }}@${{ steps.image.outputs.digest }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+      - name: Upload vulnerability evidence
+        uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98  # v4.32.6
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Generate image SBOM
+        uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d  # v0
+        with:
+          image: ${{ env.IMAGE_REPOSITORY }}@${{ steps.image.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Publish immutable Helm chart
+        id: chart
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
+            helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          mkdir -p release-output
+          helm package charts/mcp-connector --destination release-output
+          OUTPUT="$(helm push release-output/mcp-connector-*.tgz \
+            oci://ghcr.io/adask-b/mcp.connector.template/charts 2>&1)"
+          printf '%s\n' "$OUTPUT"
+          DIGEST="$(printf '%s\n' "$OUTPUT" | awk '/Digest:/ {print $2}' | tail -1)"
+          test -n "$DIGEST"
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Create deterministic provenance
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          predicate = {
+              "buildType": "https://github.com/ADASK-B/platform-release/v1",
+              "builder": {"id": os.environ["GITHUB_WORKFLOW_REF"]},
+              "invocation": {"configSource": {
+                  "uri": f"git+https://github.com/{os.environ['GITHUB_REPOSITORY']}@{os.environ['GITHUB_REF']}",
+                  "digest": {"sha1": os.environ["GITHUB_SHA"]},
+              }},
+              "metadata": {"buildInvocationId": os.environ["GITHUB_RUN_ID"]},
+          }
+          with open("provenance.json", "w", encoding="utf-8") as handle:
+              json.dump(predicate, handle, sort_keys=True, separators=(",", ":"))
+          PY
+
+      - name: Sign and attest OCI artifacts
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          CHART_DIGEST: ${{ steps.chart.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="${IMAGE_REPOSITORY}@${IMAGE_DIGEST}"
+          CHART="${CHART_REPOSITORY}@${CHART_DIGEST}"
+          cosign sign --yes "$IMAGE" "$CHART"
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$IMAGE"
+          cosign attest --yes --type slsaprovenance --predicate provenance.json "$IMAGE" "$CHART"
+
+      - name: Verify release and create manifest
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          CHART_DIGEST: ${{ steps.chart.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export IDENTITY="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}"
+          export ISSUER="https://token.actions.githubusercontent.com"
+          for SUBJECT in "${IMAGE_REPOSITORY}@${IMAGE_DIGEST}" "${CHART_REPOSITORY}@${CHART_DIGEST}"; do
+            cosign verify --certificate-identity "$IDENTITY" \
+              --certificate-oidc-issuer "$ISSUER" "$SUBJECT"
+          done
+          python3 - <<'PY'
+          import json
+          import os
+
+          manifest = {
+              "schemaVersion": "platform.adask-b.io/publisher-release/v1alpha1",
+              "artifactClass": "vendor-app",
+              "name": "mcp-connector-reference",
+              "version": os.environ["GITHUB_REF_NAME"].removeprefix("v"),
+              "source": {
+                  "repository": os.environ["GITHUB_REPOSITORY"],
+                  "commit": os.environ["GITHUB_SHA"],
+              },
+              "image": {
+                  "reference": os.environ["IMAGE_REPOSITORY"],
+                  "digest": os.environ["IMAGE_DIGEST"],
+              },
+              "chart": {
+                  "reference": os.environ["CHART_REPOSITORY"],
+                  "digest": os.environ["CHART_DIGEST"],
+              },
+              "signer": {"identity": os.environ["IDENTITY"], "issuer": os.environ["ISSUER"]},
+              "evidence": ["provenance", "sbom", "signature", "vulnerability-scan"],
+          }
+          with open("release-manifest.json", "w", encoding="utf-8") as handle:
+              json.dump(manifest, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          PY
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: mcp-connector-${{ github.ref_name }}-evidence
+          path: |
+            release-manifest.json
+            sbom.spdx.json
+            provenance.json
+            trivy-results.sarif
+            release-output/*.tgz
+          if-no-files-found: error
+
+      - name: Create immutable GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" release-manifest.json
+          sbom.spdx.json provenance.json release-output/*.tgz
+          --verify-tag --generate-notes
