@@ -1,0 +1,3 @@
+image:
+  repository: registry.invalid/reference/mcp-connector
+  digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
