@@ -220,7 +220,13 @@ jobs:
       - name: Create immutable GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME" release-manifest.json
-          sbom.spdx.json provenance.json release-output/*.tgz
-          --verify-tag --generate-notes
+        shell: bash
+        run: |
+          release_flags=(--verify-tag --generate-notes)
+          production_eligible="$(python3 -c 'import json; print(str(json.load(open("release/release-input.json"))["productionEligible"]).lower())')"
+          if [[ "$production_eligible" != "true" ]]; then
+            release_flags+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            release-manifest.json sbom.spdx.json provenance.json \
+            release-output/*.tgz "${release_flags[@]}"
