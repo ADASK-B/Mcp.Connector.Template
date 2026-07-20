@@ -65,6 +65,21 @@ jobs:
             --set image.repository=registry.invalid/reference/mcp-connector \
             --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
             >/dev/null
+          release_workflow=.github/workflows/release.yml
+          grep -Fq 'flavor: latest=false' "$release_workflow"
+          grep -Fq 'limit-severities-for-sarif: true' "$release_workflow"
+          grep -Fq 'continue-on-error: true' "$release_workflow"
+          if grep -Eq '^[[:space:]]+push:[[:space:]]+true$' "$release_workflow"; then
+            echo 'Release workflow must scan before publishing.' >&2
+            exit 1
+          fi
+          scan_line="$(grep -nF -- '- name: Scan immutable image' "$release_workflow" | cut -d: -f1)"
+          publish_line="$(grep -nF -- '- name: Publish scanned immutable image' "$release_workflow" | cut -d: -f1)"
+          sign_line="$(grep -nF -- '- name: Sign and attest published image' "$release_workflow" | cut -d: -f1)"
+          chart_line="$(grep -nF -- '- name: Publish immutable Helm chart' "$release_workflow" | cut -d: -f1)"
+          test "$scan_line" -lt "$publish_line"
+          test "$publish_line" -lt "$sign_line"
+          test "$sign_line" -lt "$chart_line"
 
       - name: Generate coverage report
         if: always()
