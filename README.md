@@ -352,6 +352,10 @@ image and App-owned Helm chart in Publisher ingress F1. Both OCI digests are
 verified against the workflow's OIDC identity. The workflow never writes to a
 customer F2 registry and never publishes `latest`.
 
+The SARIF report remains mandatory immutable release evidence. Its additional
+upload to GitHub Code Scanning is best-effort so a private-repository plan
+without that API cannot bypass or falsely fail the preceding blocking scan.
+
 | Step | Action |
 |------|--------|
 | Validate | Exact tag, chart and release-input versions; .NET tests; Helm lint/render |
