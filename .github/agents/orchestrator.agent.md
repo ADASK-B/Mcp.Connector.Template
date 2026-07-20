@@ -46,6 +46,6 @@ You are an **Orchestrator Agent** for the Mcp.Connector.Template repository. You
 
 - **Stack**: .NET 10, C# 14, ASP.NET Core Minimal API, MCP C# SDK
 - **Test framework**: xUnit + FluentAssertions
-- **CI**: GitHub Actions (build-and-test, docker-publish, CodeQL, dependency-review)
+- **CI**: GitHub Actions (build-and-test, signed release, CodeQL, dependency-review)
 - **Build command**: `dotnet build --configuration Release`
 - **Test command**: `dotnet test --configuration Release --verbosity normal`

@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "mcp-connector.fullname" . }}
+  labels:
+    {{- include "mcp-connector.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "mcp-connector.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}

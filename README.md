@@ -26,7 +26,7 @@
 - [Testing](#testing)
 - [CI/CD Pipeline](#cicd-pipeline)
   - [Build and Test](#build-and-test)
-  - [Docker Publish to GHCR](#docker-publish-to-ghcr)
+  - [Signed App Release to F1](#signed-app-release-to-f1)
   - [CodeQL Analysis](#codeql-analysis)
   - [Dependency Review](#dependency-review)
   - [Dependabot](#dependabot)
@@ -51,7 +51,7 @@ This template provides the complete scaffolding for an MCP connector service:
 
 - **ASP.NET Core Minimal API** exposing MCP tools over Streamable HTTP transport
 - **Multi-stage Docker image** optimized for production (non-root, port 8080)
-- **4 GitHub Actions workflows** for CI, security scanning, and container publishing
+- **4 GitHub Actions workflows** for CI, security scanning, and signed OCI publishing
 - **5 custom Copilot agents** with orchestrator pattern for AI-assisted development
 - **6 prompt files** for common development workflows
 - **3 skill guides** with step-by-step instructions for tools, TDD, and security hardening
@@ -243,8 +243,9 @@ Point any MCP-compatible client to the server URL:
 **Quick start with Docker + VS Code Copilot:**
 
 ```bash
-# Start the container
-docker run -p 8080:8080 ghcr.io/adask-b/mcp.connector.template:latest
+# Start one verified immutable release (replace with its published digest)
+docker run -p 8080:8080 \
+  ghcr.io/adask-b/mcp.connector.template@sha256:<verified-image-digest>
 ```
 
 The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://localhost:8080/mcp`. Once the container is running, VS Code Copilot can use the `getWeather` tool directly in chat.
@@ -340,18 +341,23 @@ Runs `dotnet restore` → `dotnet build` → `dotnet test`. This is the primary 
 | Build | `dotnet build --no-restore --configuration Release` |
 | Test | `dotnet test --no-build --configuration Release --verbosity normal` |
 
-### Docker Publish to GHCR
+### Signed App Release to F1
 
-**File:** `.github/workflows/docker-publish.yml`  
-**Triggers:** Push to `main`, Manual dispatch
+**File:** `.github/workflows/release.yml`
+**Trigger:** reviewed SemVer tag (`v*`)
 
-Builds the multi-stage Docker image and pushes it to GitHub Container Registry (`ghcr.io`). Images are tagged with `latest` and the Git SHA.
+Builds the multi-stage image and an App-owned Helm chart, publishes both to the
+Publisher ingress F1, scans the immutable image, emits an SPDX SBOM and
+provenance, and signs both OCI digests with the workflow's OIDC identity. It
+never writes to a customer F2 registry and never publishes `latest`.
 
 | Step | Action |
 |------|--------|
-| Login | `docker/login-action` → GHCR with `GITHUB_TOKEN` |
-| Metadata | `docker/metadata-action` → tags + OCI labels |
-| Build & Push | `docker/build-push-action` → multi-stage Dockerfile |
+| Validate | Exact tag, chart and release-input versions; .NET tests; Helm lint/render |
+| Publish | Image and Helm chart to `ghcr.io/adask-b/mcp.connector.template` (F1) |
+| Evidence | Trivy SARIF, SPDX SBOM, deterministic provenance and release manifest |
+| Trust | Keyless Cosign signatures and verification against the exact workflow identity |
+| Delivery | A separate approved workflow promotes selected digests from F1 to customer F2b |
 
 ### CodeQL Analysis
 

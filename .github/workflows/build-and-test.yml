@@ -46,6 +46,26 @@ jobs:
           --collect:"XPlat Code Coverage"
           --results-directory ./TestResults
 
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4  # v4
+        with:
+          version: v4.1.3
+
+      - name: Validate immutable App chart contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^version: //p' charts/mcp-connector/Chart.yaml)"
+          test "$(sed -n 's/^appVersion: "\(.*\)"/\1/p' charts/mcp-connector/Chart.yaml)" = "$VERSION"
+          test "$(python3 -c 'import json; print(json.load(open("release/release-input.json"))["version"])')" = "$VERSION"
+          helm lint charts/mcp-connector \
+            --set image.repository=registry.invalid/reference/mcp-connector \
+            --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          helm template mcp-reference charts/mcp-connector \
+            --set image.repository=registry.invalid/reference/mcp-connector \
+            --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            >/dev/null
+
       - name: Generate coverage report
         if: always()
         run: |

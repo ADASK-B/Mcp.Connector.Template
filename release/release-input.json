@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "platform.adask-b.io/app-release-input/v1alpha1",
+  "artifactClass": "vendor-app",
+  "name": "mcp-connector-reference",
+  "version": "1.0.1",
+  "publisher": {
+    "repository": "https://github.com/ADASK-B/Mcp.Connector.Template",
+    "f1Namespace": "ghcr.io/adask-b/mcp.connector.template",
+    "signerIdentity": "https://github.com/ADASK-B/Mcp.Connector.Template/.github/workflows/release.yml@refs/tags/v*",
+    "issuer": "https://token.actions.githubusercontent.com"
+  },
+  "requiredEvidence": [
+    "provenance",
+    "sbom",
+    "signature",
+    "vulnerability-scan"
+  ],
+  "license": "MIT",
+  "productionEligible": false,
+  "blockers": [
+    "v1.0.1-signed-release-not-yet-published",
+    "approved-delivery-to-f2b-not-yet-proven"
+  ]
+}

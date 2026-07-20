@@ -2,7 +2,7 @@
   "servers": {
     // ──────────────────────────────────────────────────────────────
     // Weather MCP Server — run via Docker container.
-    // Start: docker run -p 8080:8080 ghcr.io/adask-b/mcp.connector.template:latest
+    // Start a verified release: docker run -p 8080:8080 ghcr.io/adask-b/mcp.connector.template@sha256:<digest>
     // Then Copilot can use the "getWeather" tool directly in chat.
     // ──────────────────────────────────────────────────────────────
     "weather": {
