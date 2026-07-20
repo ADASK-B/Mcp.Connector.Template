@@ -77,17 +77,29 @@ jobs:
         uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf  # v6.0.0
         with:
           images: ${{ env.IMAGE_REPOSITORY }}
+          flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
             type=sha,format=long
 
-      - name: Build and publish image
-        id: image
+      - name: Reject mutable image tags
+        shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          if grep -Fxq "${IMAGE_REPOSITORY}:latest" <<< "$IMAGE_TAGS"; then
+            echo 'The release must never publish the mutable latest tag.' >&2
+            exit 1
+          fi
+
+      - name: Build image for pre-publication scan
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
         with:
           context: .
           file: ./Mcp.Connector.Template/Dockerfile
-          push: true
+          push: false
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -96,13 +108,15 @@ jobs:
       - name: Scan immutable image
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # 0.35.0
         with:
-          image-ref: ${{ env.IMAGE_REPOSITORY }}@${{ steps.image.outputs.digest }}
+          image-ref: ${{ env.IMAGE_REPOSITORY }}:${{ steps.meta.outputs.version }}
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
+          limit-severities-for-sarif: true
           exit-code: '1'
 
       - name: Upload vulnerability evidence
+        if: always()
         uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98  # v4.32.6
         with:
           sarif_file: trivy-results.sarif
@@ -110,25 +124,9 @@ jobs:
       - name: Generate image SBOM
         uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d  # v0
         with:
-          image: ${{ env.IMAGE_REPOSITORY }}@${{ steps.image.outputs.digest }}
+          image: ${{ env.IMAGE_REPOSITORY }}:${{ steps.meta.outputs.version }}
           format: spdx-json
           output-file: sbom.spdx.json
-
-      - name: Publish immutable Helm chart
-        id: chart
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
-            helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-          mkdir -p release-output
-          helm package charts/mcp-connector --destination release-output
-          OUTPUT="$(helm push release-output/mcp-connector-*.tgz \
-            oci://ghcr.io/adask-b/mcp.connector.template/charts 2>&1)"
-          printf '%s\n' "$OUTPUT"
-          DIGEST="$(printf '%s\n' "$OUTPUT" | awk '/Digest:/ {print $2}' | tail -1)"
-          test -n "$DIGEST"
-          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
 
       - name: Create deterministic provenance
         shell: bash
@@ -150,18 +148,62 @@ jobs:
               json.dump(predicate, handle, sort_keys=True, separators=(",", ":"))
           PY
 
-      - name: Sign and attest OCI artifacts
+      - name: Publish scanned immutable image
+        id: image
+        shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          version_ref="${IMAGE_REPOSITORY}:${{ steps.meta.outputs.version }}"
+          digest=''
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] || continue
+            output="$(docker push "$tag" 2>&1)"
+            printf '%s\n' "$output"
+            if [[ "$tag" == "$version_ref" ]]; then
+              digest="$(printf '%s\n' "$output" | awk '/digest:/ {for (i=1; i<=NF; i++) if ($i == "digest:") print $(i+1)}' | tail -1)"
+            fi
+          done <<< "$IMAGE_TAGS"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Sign and attest published image
         env:
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${IMAGE_REPOSITORY}@${IMAGE_DIGEST}"
+          cosign sign --yes "$image"
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$image"
+          cosign attest --yes --type slsaprovenance --predicate provenance.json "$image"
+
+      - name: Publish immutable Helm chart
+        id: chart
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
+            helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          mkdir -p release-output
+          helm package charts/mcp-connector --destination release-output
+          OUTPUT="$(helm push release-output/mcp-connector-*.tgz \
+            oci://ghcr.io/adask-b/mcp.connector.template/charts 2>&1)"
+          printf '%s\n' "$OUTPUT"
+          DIGEST="$(printf '%s\n' "$OUTPUT" | awk '/Digest:/ {print $2}' | tail -1)"
+          test -n "$DIGEST"
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Sign and attest published chart
+        env:
           CHART_DIGEST: ${{ steps.chart.outputs.digest }}
         shell: bash
         run: |
           set -euo pipefail
-          IMAGE="${IMAGE_REPOSITORY}@${IMAGE_DIGEST}"
-          CHART="${CHART_REPOSITORY}@${CHART_DIGEST}"
-          cosign sign --yes "$IMAGE" "$CHART"
-          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$IMAGE"
-          cosign attest --yes --type slsaprovenance --predicate provenance.json "$IMAGE" "$CHART"
+          chart="${CHART_REPOSITORY}@${CHART_DIGEST}"
+          cosign sign --yes "$chart"
+          cosign attest --yes --type slsaprovenance --predicate provenance.json "$chart"
 
       - name: Verify release and create manifest
         env:

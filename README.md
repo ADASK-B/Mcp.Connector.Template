@@ -346,10 +346,11 @@ Runs `dotnet restore` → `dotnet build` → `dotnet test`. This is the primary 
 **File:** `.github/workflows/release.yml`
 **Trigger:** reviewed SemVer tag (`v*`)
 
-Builds the multi-stage image and an App-owned Helm chart, publishes both to the
-Publisher ingress F1, scans the immutable image, emits an SPDX SBOM and
-provenance, and signs both OCI digests with the workflow's OIDC identity. It
-never writes to a customer F2 registry and never publishes `latest`.
+Builds the multi-stage image locally, scans it before publication, emits an
+SPDX SBOM and provenance, and only then publishes and immediately signs the
+image and App-owned Helm chart in Publisher ingress F1. Both OCI digests are
+verified against the workflow's OIDC identity. The workflow never writes to a
+customer F2 registry and never publishes `latest`.
 
 | Step | Action |
 |------|--------|
