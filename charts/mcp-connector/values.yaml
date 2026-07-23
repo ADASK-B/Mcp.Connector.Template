@@ -1,5 +1,11 @@
 replicaCount: 2
 
+# Required platform workload labels (Kyverno policy: require-labels)
+labels:
+  app: ""          # REQUIRED
+  team: ""         # REQUIRED
+  environment: ""  # REQUIRED
+
 image:
   repository: ""
   digest: ""

@@ -59,11 +59,9 @@ jobs:
           test "$(sed -n 's/^appVersion: "\(.*\)"/\1/p' charts/mcp-connector/Chart.yaml)" = "$VERSION"
           test "$(python3 -c 'import json; print(json.load(open("release/release-input.json"))["version"])')" = "$VERSION"
           helm lint charts/mcp-connector \
-            --set image.repository=registry.invalid/reference/mcp-connector \
-            --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            --values release/trivy-chart-values.yaml
           helm template mcp-reference charts/mcp-connector \
-            --set image.repository=registry.invalid/reference/mcp-connector \
-            --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            --values release/trivy-chart-values.yaml \
             >/dev/null
           release_workflow=.github/workflows/release.yml
           grep -Fq 'flavor: latest=false' "$release_workflow"

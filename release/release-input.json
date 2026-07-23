@@ -2,7 +2,7 @@
   "schemaVersion": "platform.adask-b.io/app-release-input/v1alpha1",
   "artifactClass": "vendor-app",
   "name": "mcp-connector-reference",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": {
     "repository": "https://github.com/ADASK-B/Mcp.Connector.Template",
     "f1Namespace": "ghcr.io/adask-b/mcp.connector.template",
