@@ -1,3 +1,7 @@
 image:
   repository: registry.invalid/reference/mcp-connector
   digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+labels:
+  app: mcp-connector
+  team: mcp-connectors
+  environment: reference

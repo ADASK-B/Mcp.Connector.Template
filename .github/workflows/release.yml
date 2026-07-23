@@ -59,11 +59,9 @@ jobs:
           dotnet build --configuration Release --no-restore
           dotnet test --configuration Release --no-build --verbosity normal
           helm lint charts/mcp-connector \
-            --set image.repository=registry.invalid/reference/mcp-connector \
-            --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            --values release/trivy-chart-values.yaml
           helm template mcp-reference charts/mcp-connector \
-            --set image.repository=registry.invalid/reference/mcp-connector \
-            --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+            --values release/trivy-chart-values.yaml \
             >/dev/null
 
       - name: Log in to Publisher registry F1

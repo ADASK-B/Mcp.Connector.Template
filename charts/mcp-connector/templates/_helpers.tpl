@@ -12,4 +12,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 platform.adask-b.io/trust-zone: vendor-apps
+app: {{ required "labels.app is required" .Values.labels.app }}
+team: {{ required "labels.team is required" .Values.labels.team }}
+environment: {{ required "labels.environment is required" .Values.labels.environment }}
 {{- end -}}
