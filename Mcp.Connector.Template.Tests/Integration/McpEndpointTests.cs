@@ -73,7 +73,7 @@ public class McpEndpointTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task McpEndpoint_ToolsCall_GetWeather_ReturnsWeatherData()
+    public async Task McpEndpoint_ToolsCall_EchoSynthetic_ReturnsDeterministicData()
     {
         // Step 1: Initialize the MCP session
         var initRequest = CreateMcpRequest("""
@@ -97,17 +97,16 @@ public class McpEndpointTests : IClassFixture<CustomWebApplicationFactory>
             ? values.First()
             : null;
 
-        // Step 2: Call tools/call with getWeather
+        // Step 2: Call tools/call with the side-effect-free synthetic tool
         var callRequest = CreateMcpRequest("""
         {
             "jsonrpc": "2.0",
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "getWeather",
+                "name": "echoSynthetic",
                 "arguments": {
-                    "latitude": 40.71,
-                    "longitude": -74.01
+                    "message": "platform-test-payload"
                 }
             }
         }
@@ -118,11 +117,11 @@ public class McpEndpointTests : IClassFixture<CustomWebApplicationFactory>
 
         var callResponse = await _client.SendAsync(callRequest);
 
-        // Assert — the tool should return weather data from the fake handler
+        // Assert — the result is independent of public network access
         callResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await callResponse.Content.ReadAsStringAsync();
-        body.Should().Contain("temperature_2m");
-        body.Should().Contain("America/New_York");
+        body.Should().Contain("platform-test-payload");
+        body.Should().Contain("length");
     }
 
     /// <summary>
