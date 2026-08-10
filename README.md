@@ -75,11 +75,12 @@ New connectors are created by using this repo as a GitHub template and adding
 tool/service/model classes. The checked-in runnable reference stays intentionally
 small so failures point to the Platform rather than application logic.
 
-This repository currently proves only that the independent, buildable Test App
-source exists. Runtime version/readiness, setup-derived configuration, Secret,
-storage, controlled egress, observability, signed release, delivery, activation,
-convergence, security, rollback, recovery, air-gap, and production gates remain
-separate Platform-plan work.
+This repository currently proves that the independent Test App source builds
+and that its liveness, readiness, and exact release-identity endpoints satisfy
+their local contract tests. Setup-derived configuration, Secret, storage,
+controlled egress, observability, a qualifying signed release, delivery,
+activation, live convergence, security, rollback, recovery, air-gap, and
+production gates remain separate Platform-plan work.
 
 ---
 
@@ -133,7 +134,7 @@ graph TD
 
     subgraph Host["ASP.NET Core Host"]
         direction TB
-        Endpoints["GET /health - Health probe (200 OK)<br/>POST /mcp - MCP JSON-RPC endpoint"]
+        Endpoints["GET /healthz - Process health<br/>GET /readyz - Traffic readiness<br/>GET /version - Exact release identity<br/>POST /mcp - MCP JSON-RPC"]
         SDK["MCP SDK Middleware<br/>initialize → tools/list → tools/call"]
         Tools["Synthetic Echo Tool [McpServerToolType]<br/>Auto-discovered via assembly scan"]
         Model["Deterministic response model"]
@@ -152,6 +153,7 @@ graph TD
 - **No OpenAPI** - tool discovery happens through the MCP protocol itself
 - **No HTTPS** - TLS termination is handled at the PaaS/ingress level; the container listens on plain HTTP
 - **No reference-app dependencies** - the checked-in Test App makes no external calls; connectors created from the template may add explicit typed services
+- **Immutable runtime identity** - `/version` reads release identity embedded at build time from `release/release-input.json`; there is no environment or runtime fallback
 
 ---
 
@@ -168,10 +170,13 @@ Mcp.Connector.Template/
 │   └── mcp.json                          # VS Code Copilot MCP server configuration
 │
 ├── Mcp.Connector.Template/               # Main application project
-│   ├── Program.cs                        # Host, DI, endpoints (MapMcp + /health)
+│   ├── Program.cs                        # Host, DI, MCP and lifecycle endpoints
 │   ├── Tools/                            # MCP tool classes ([McpServerToolType])
 │   │   └── SyntheticEchoTool.cs
-│   ├── Models/                           # DTOs (record types)
+│   ├── Models/                           # Typed tool and lifecycle contracts
+│   │   ├── ApplicationReleaseIdentity.cs
+│   │   ├── ApplicationVersionResponse.cs
+│   │   ├── HealthStatusResponse.cs
 │   │   └── SyntheticEchoResponse.cs
 │   ├── Dockerfile                        # Multi-stage container build
 │   ├── appsettings.json                  # Configuration
@@ -179,10 +184,11 @@ Mcp.Connector.Template/
 │       └── launchSettings.json           # Local dev (port 5076) + Docker profile
 │
 ├── Mcp.Connector.Template.Tests/         # Test project
-│   ├── Unit/                             # Tool logic, validation, DTO mapping
+│   ├── Unit/                             # Tool logic and fail-closed identity parsing
+│   │   ├── ApplicationReleaseIdentityTests.cs
 │   │   └── SyntheticEchoToolTests.cs
 │   ├── Integration/                      # WebApplicationFactory-based tests
-│   │   ├── HealthEndpointTests.cs
+│   │   ├── LifecycleEndpointTests.cs
 │   │   └── McpEndpointTests.cs
 │   └── TestInfrastructure/               # Shared test setup
 │       └── CustomWebApplicationFactory.cs
@@ -230,7 +236,8 @@ cd Mcp.Connector.Template
 dotnet run
 ```
 
-The server starts at `http://localhost:5076`. The MCP endpoint is at `/mcp` and the health probe at `/health`.
+The server starts at `http://localhost:5076`. The MCP endpoint is at `/mcp`.
+Lifecycle endpoints are `/healthz`, `/readyz`, and `/version`.
 
 ### Run in Docker
 
@@ -575,7 +582,9 @@ This template enforces security at multiple levels:
 | **Tool Discovery** | `WithToolsFromAssembly()` scans for `[McpServerToolType]` classes |
 | **Tool Invocation** | `[McpServerTool]` methods are called by the SDK on `tools/call` |
 | **Parameter Schema** | Auto-generated from `[Description]` attributes |
-| **Health Probe** | `GET /health` - custom endpoint for container orchestration (not part of MCP spec) |
+| **Liveness** | `GET /healthz` - process health for container orchestration |
+| **Readiness** | `GET /readyz` - whether this dependency-free Test App can accept traffic |
+| **Release Identity** | `GET /version` - exact `applicationId` and `releaseVersion` baked from release input |
 | **Compatible Clients** | OpenAI Responses API, Claude Desktop, VS Code Copilot, and any MCP client |
 
 ### Resources

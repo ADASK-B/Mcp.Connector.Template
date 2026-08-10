@@ -11,7 +11,11 @@
 //   • Error responses in MCP format
 // -----------------------------------------------------------------------
 
+using Mcp.Connector.Template.Models;
+
+var releaseIdentity = ApplicationReleaseIdentity.Load(typeof(Program).Assembly);
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton(releaseIdentity);
 
 // ---------------------------------------------------------------------------
 //  Register the MCP server with Streamable HTTP transport.
@@ -26,13 +30,14 @@ builder.Services
 var app = builder.Build();
 
 // ---------------------------------------------------------------------------
-//  Health probe — used by container orchestration (Docker, Kubernetes, Azure).
-//  This is a liveness check (always returns 200 if the process is running).
-//  For readiness checks that verify external dependencies, consider adding
-//  a separate /ready endpoint using ASP.NET Core Health Checks:
-//  https://learn.microsoft.com/aspnet/core/host-and-deploy/health-checks
+//  ApplicationContract lifecycle endpoints. This deliberately simple Test App
+//  has no runtime dependencies, so a running host is also ready for traffic.
 // ---------------------------------------------------------------------------
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+app.MapGet("/healthz", static () => Results.Ok(new HealthStatusResponse("healthy")));
+app.MapGet("/readyz", static () => Results.Ok(new HealthStatusResponse("ready")));
+app.MapGet(
+    "/version",
+    static (ApplicationReleaseIdentity identity) => Results.Ok(identity.ToResponse()));
 
 // ---------------------------------------------------------------------------
 //  MCP endpoint — the SDK handles everything at this path:
