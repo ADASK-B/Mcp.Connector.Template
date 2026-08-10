@@ -77,9 +77,11 @@ small so failures point to the Platform rather than application logic.
 
 This repository currently proves that the independent Test App source builds
 and that its liveness, readiness, and exact release-identity endpoints satisfy
-their local contract tests. Setup-derived configuration, Secret, storage,
-controlled egress, observability, a qualifying signed release, delivery,
-activation, live convergence, security, rollback, recovery, air-gap, and
+their local contract tests. It also proves the local chart-to-file-to-`/config`
+contract for one non-sensitive `application.message` value, without a chart,
+environment, CLI, or application default. Live setup-to-cluster configuration,
+Secret, storage, controlled egress, observability, a qualifying signed release,
+delivery, activation, convergence, security, rollback, recovery, air-gap, and
 production gates remain separate Platform-plan work.
 
 ---
@@ -134,7 +136,7 @@ graph TD
 
     subgraph Host["ASP.NET Core Host"]
         direction TB
-        Endpoints["GET /healthz - Process health<br/>GET /readyz - Traffic readiness<br/>GET /version - Exact release identity<br/>POST /mcp - MCP JSON-RPC"]
+        Endpoints["GET /healthz - Process health<br/>GET /readyz - Traffic readiness<br/>GET /version - Exact release identity<br/>GET /config - Non-sensitive generated value<br/>POST /mcp - MCP JSON-RPC"]
         SDK["MCP SDK Middleware<br/>initialize → tools/list → tools/call"]
         Tools["Synthetic Echo Tool [McpServerToolType]<br/>Auto-discovered via assembly scan"]
         Model["Deterministic response model"]
@@ -154,6 +156,7 @@ graph TD
 - **No HTTPS** - TLS termination is handled at the PaaS/ingress level; the container listens on plain HTTP
 - **No reference-app dependencies** - the checked-in Test App makes no external calls; connectors created from the template may add explicit typed services
 - **Immutable runtime identity** - `/version` reads release identity embedded at build time from `release/release-input.json`; there is no environment or runtime fallback
+- **One configuration path** - the chart requires centrally generated `application.message`, mounts one typed JSON file, and the process fails startup if that file is absent or invalid
 
 ---
 
@@ -174,19 +177,24 @@ Mcp.Connector.Template/
 │   ├── Tools/                            # MCP tool classes ([McpServerToolType])
 │   │   └── SyntheticEchoTool.cs
 │   ├── Models/                           # Typed tool and lifecycle contracts
+│   │   ├── ApplicationConfiguration.cs
+│   │   ├── ApplicationConfigurationResponse.cs
 │   │   ├── ApplicationReleaseIdentity.cs
 │   │   ├── ApplicationVersionResponse.cs
 │   │   ├── HealthStatusResponse.cs
 │   │   └── SyntheticEchoResponse.cs
 │   ├── Dockerfile                        # Multi-stage container build
-│   ├── appsettings.json                  # Configuration
+│   ├── appsettings.json                  # Framework logging/host settings only
 │   └── Properties/
 │       └── launchSettings.json           # Local dev (port 5076) + Docker profile
 │
 ├── Mcp.Connector.Template.Tests/         # Test project
-│   ├── Unit/                             # Tool logic and fail-closed identity parsing
+│   ├── Unit/                             # Tool logic and fail-closed contract parsing
+│   │   ├── ApplicationConfigurationTests.cs
 │   │   ├── ApplicationReleaseIdentityTests.cs
 │   │   └── SyntheticEchoToolTests.cs
+│   ├── Fixtures/                         # Synthetic local-test input only
+│   │   └── application-configuration.json
 │   ├── Integration/                      # WebApplicationFactory-based tests
 │   │   ├── LifecycleEndpointTests.cs
 │   │   └── McpEndpointTests.cs
@@ -231,13 +239,11 @@ dotnet restore
 dotnet build --configuration Release --no-restore
 dotnet test --configuration Release --no-build --verbosity normal
 
-# Run the MCP server
-cd Mcp.Connector.Template
-dotnet run
 ```
 
-The server starts at `http://localhost:5076`. The MCP endpoint is at `/mcp`.
-Lifecycle endpoints are `/healthz`, `/readyz`, and `/version`.
+The production entrypoint intentionally refuses to start without the generated
+configuration file at `/etc/adask/platform-test/configuration.json`. Integration
+tests inject an exact synthetic value without introducing a runtime fallback.
 
 ### Run in Docker
 
@@ -245,11 +251,16 @@ Lifecycle endpoints are `/healthz`, `/readyz`, and `/version`.
 # Build the image
 docker build -f Mcp.Connector.Template/Dockerfile -t mcp-connector .
 
-# Run the container
-docker run -p 8080:8080 mcp-connector
+# Run with the explicitly test-only synthetic fixture
+docker run -p 8080:8080 \
+  --mount type=bind,src="$(pwd)/Mcp.Connector.Template.Tests/Fixtures/application-configuration.json",dst=/etc/adask/platform-test/configuration.json,readonly \
+  mcp-connector
 ```
 
-The containerized server listens on `http://localhost:8080`.
+The containerized server listens on `http://localhost:8080`; `/config` returns
+the exact synthetic fixture value. Customer operation does not use this mount
+command: `platformctl` generates the Helm value from the canonical resolved
+setup model, and the release chart renders and mounts the file.
 
 ### Connect an MCP Client
 
@@ -261,12 +272,13 @@ Point any MCP-compatible client to the server URL:
 | **Claude Desktop** | Add to `claude_desktop_config.json` as remote MCP server |
 | **OpenAI Responses API** | Use as remote MCP server URL |
 
-**Quick start with Docker + VS Code Copilot:**
+**Local test with Docker + VS Code Copilot:**
 
 ```bash
-# Start one verified immutable release (replace with its published digest)
+# This fixture is for local source testing only, not customer desired state.
 docker run -p 8080:8080 \
-  ghcr.io/adask-b/mcp.connector.template@sha256:<verified-image-digest>
+  --mount type=bind,src="$(pwd)/Mcp.Connector.Template.Tests/Fixtures/application-configuration.json",dst=/etc/adask/platform-test/configuration.json,readonly \
+  mcp-connector
 ```
 
 The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://localhost:8080/mcp`. Once the container is running, VS Code Copilot can use the `echoSynthetic` tool directly in chat.
@@ -585,6 +597,7 @@ This template enforces security at multiple levels:
 | **Liveness** | `GET /healthz` - process health for container orchestration |
 | **Readiness** | `GET /readyz` - whether this dependency-free Test App can accept traffic |
 | **Release Identity** | `GET /version` - exact `applicationId` and `releaseVersion` baked from release input |
+| **Configuration** | `GET /config` - exact non-sensitive value received through the generated mounted-file contract |
 | **Compatible Clients** | OpenAI Responses API, Claude Desktop, VS Code Copilot, and any MCP client |
 
 ### Resources

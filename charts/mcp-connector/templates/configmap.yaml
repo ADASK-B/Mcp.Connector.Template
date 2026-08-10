@@ -1,0 +1,16 @@
+{{- $message := required "application.message is required from generated setup values" .Values.application.message -}}
+{{- if not (kindIs "string" $message) -}}
+{{- fail "application.message must be a string from generated setup values" -}}
+{{- end -}}
+{{- if gt (len (regexFindAll "." $message -1)) 128 -}}
+{{- fail "application.message must contain at most 128 Unicode characters" -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mcp-connector.fullname" . }}-configuration
+  labels:
+    {{- include "mcp-connector.labels" . | nindent 4 }}
+data:
+  configuration.json: |
+    {{ dict "schemaVersion" "platform.adask-b.io/platform-test-configuration/v1alpha1" "message" $message | toJson }}

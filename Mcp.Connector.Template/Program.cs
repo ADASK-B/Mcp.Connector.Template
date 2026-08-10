@@ -16,6 +16,8 @@ using Mcp.Connector.Template.Models;
 var releaseIdentity = ApplicationReleaseIdentity.Load(typeof(Program).Assembly);
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton(releaseIdentity);
+builder.Services.AddSingleton(
+    static _ => ApplicationConfiguration.LoadFromFile(ApplicationConfiguration.FilePath));
 
 // ---------------------------------------------------------------------------
 //  Register the MCP server with Streamable HTTP transport.
@@ -29,6 +31,11 @@ builder.Services
 
 var app = builder.Build();
 
+// Resolve required setup-derived configuration during startup. A missing or
+// malformed generated file must stop the process instead of activating a
+// hidden application default.
+_ = app.Services.GetRequiredService<ApplicationConfiguration>();
+
 // ---------------------------------------------------------------------------
 //  ApplicationContract lifecycle endpoints. This deliberately simple Test App
 //  has no runtime dependencies, so a running host is also ready for traffic.
@@ -38,6 +45,9 @@ app.MapGet("/readyz", static () => Results.Ok(new HealthStatusResponse("ready"))
 app.MapGet(
     "/version",
     static (ApplicationReleaseIdentity identity) => Results.Ok(identity.ToResponse()));
+app.MapGet(
+    "/config",
+    static (ApplicationConfiguration configuration) => Results.Ok(configuration.ToResponse()));
 
 // ---------------------------------------------------------------------------
 //  MCP endpoint — the SDK handles everything at this path:

@@ -63,6 +63,7 @@ jobs:
           helm template mcp-reference charts/mcp-connector \
             --values release/trivy-chart-values.yaml \
             >/dev/null
+          bash scripts/validate-configuration-contract.sh
           release_workflow=.github/workflows/release.yml
           grep -Fq 'flavor: latest=false' "$release_workflow"
           grep -Fq 'limit-severities-for-sarif: true' "$release_workflow"
