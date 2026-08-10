@@ -11,19 +11,7 @@
 //   • Error responses in MCP format
 // -----------------------------------------------------------------------
 
-using Mcp.Connector.Template.Services;
-
 var builder = WebApplication.CreateBuilder(args);
-
-// ---------------------------------------------------------------------------
-//  Register external API services via IHttpClientFactory.
-//  Each service gets its own typed HttpClient with independent settings.
-// ---------------------------------------------------------------------------
-builder.Services.AddHttpClient<OpenMeteoService>(client =>
-{
-    client.BaseAddress = new Uri("https://api.open-meteo.com");
-    client.Timeout = TimeSpan.FromSeconds(10);
-});
 
 // ---------------------------------------------------------------------------
 //  Register the MCP server with Streamable HTTP transport.

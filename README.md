@@ -7,8 +7,9 @@
 [![Docker](https://img.shields.io/badge/Docker-GHCR-2496ed?logo=docker&logoColor=white)](https://github.com/ADASK-B/Mcp.Connector.Template/pkgs/container/mcp.connector.template)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-> **Enterprise template repository** for building [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) connector services in C#.  
-> Clone this template, add your tools - get a production-ready, container-first MCP server with CI/CD, security scanning, and AI-assisted development out of the box.
+> **Reusable template and deliberately small Platform Test Application** for
+> [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) services in C#.
+> The runnable reference is intentionally synthetic and does not claim production readiness.
 
 ---
 
@@ -47,10 +48,20 @@
 
 ## Overview
 
-This template provides the complete scaffolding for an MCP connector service:
+This repository has two deliberately compatible roles:
+
+- the reusable C# MCP connector source template; and
+- the independent runnable Platform Test Application/reference publisher used
+  by the ADASK Platform program.
+
+Keeping both roles here preserves the canonical four-repository reference
+workspace. A fifth test-only repository would duplicate the same App publisher
+boundary without proving a different contract.
+
+The repository provides the following scaffolding:
 
 - **ASP.NET Core Minimal API** exposing MCP tools over Streamable HTTP transport
-- **Multi-stage Docker image** optimized for production (non-root, port 8080)
+- **Multi-stage Docker image** with a non-root runtime baseline on port 8080
 - **4 GitHub Actions workflows** for CI, security scanning, and signed OCI publishing
 - **5 custom Copilot agents** with orchestrator pattern for AI-assisted development
 - **6 prompt files** for common development workflows
@@ -60,32 +71,40 @@ This template provides the complete scaffolding for an MCP connector service:
 - **CodeQL** for static application security testing (SAST)
 - **Pull request template**, issue templates, and CODEOWNERS for governance
 
-New connectors are created by using this repo as a GitHub template and adding tool/service/model classes. The hosting framework, CI/CD, and Copilot configuration stay untouched.
+New connectors are created by using this repo as a GitHub template and adding
+tool/service/model classes. The checked-in runnable reference stays intentionally
+small so failures point to the Platform rather than application logic.
+
+This repository currently proves only that the independent, buildable Test App
+source exists. Runtime version/readiness, setup-derived configuration, Secret,
+storage, controlled egress, observability, signed release, delivery, activation,
+convergence, security, rollback, recovery, air-gap, and production gates remain
+separate Platform-plan work.
 
 ---
 
-## Included Example: Weather Tool
+## Included Example: Synthetic Echo Tool
 
-The template ships with a **fully working example** - an MCP tool that wraps the [Open-Meteo](https://open-meteo.com/) weather API (free, no API key required).
+The runnable reference exposes one deterministic, side-effect-free MCP tool.
+It makes no network calls, reads no Secret, stores no state, and needs no public
+Internet access.
 
 | Component | File | Description |
 |-----------|------|-------------|
-| **Tool** | `Tools/WeatherTool.cs` | `getWeather` - returns current weather for given coordinates |
-| **Service** | `Services/OpenMeteoService.cs` | HTTP client wrapper for the Open-Meteo REST API |
-| **Models** | `Models/WeatherModels.cs` | API response DTOs (records) |
+| **Tool** | `Tools/SyntheticEchoTool.cs` | `echoSynthetic` - returns supplied synthetic test text and its length |
+| **Model** | `Models/SyntheticEchoResponse.cs` | Deterministic response DTO |
 
 **Example interaction:**
 ```
-User:  "What's the weather in Berlin?"
-LLM:   → resolves Berlin to 52.52, 13.41
-       → calls getWeather(latitude: 52.52, longitude: 13.41)
-Tool:  → fetches from api.open-meteo.com
-LLM:   "It's currently 8.3°C in Berlin with 72% humidity and 15 km/h wind."
+User:  "Echo the synthetic Platform test payload"
+LLM:   → calls echoSynthetic(message: "platform-test-payload")
+Tool:  → returns {"message":"platform-test-payload","length":21}
 ```
 
-**Response fields:** Latitude, Longitude, Timezone, Temperature, WindSpeedKmh, RelativeHumidityPercent, CurrentUnits.
-
-This example demonstrates the full pattern: input validation, error handling, `CancellationToken` forwarding, and corresponding unit + integration tests. Use it as a reference when adding your own tools.
+The input is limited to 256 characters and must not contain secrets or personal
+data. The example demonstrates tool discovery, input validation,
+`CancellationToken` handling, structured JSON, and unit/integration testing
+without hiding Platform behavior behind an external service.
 
 ---
 
@@ -116,15 +135,13 @@ graph TD
         direction TB
         Endpoints["GET /health - Health probe (200 OK)<br/>POST /mcp - MCP JSON-RPC endpoint"]
         SDK["MCP SDK Middleware<br/>initialize → tools/list → tools/call"]
-        Tools["Tool Classes [McpServerToolType]<br/>Auto-discovered via assembly scan"]
-        Services["Service Classes (HttpClient)<br/>External API communication"]
+        Tools["Synthetic Echo Tool [McpServerToolType]<br/>Auto-discovered via assembly scan"]
+        Model["Deterministic response model"]
 
         Endpoints --> SDK
         SDK --> Tools
-        Tools -->|"DI (method injection)"| Services
+        Tools --> Model
     end
-
-    Services -->|"HTTP"| API["External APIs"]
 ```
 
 ### Key Design Decisions
@@ -134,6 +151,7 @@ graph TD
 - **No routing changes needed** - adding a new `[McpServerToolType]` class is enough; the SDK handles `tools/list` and `tools/call`
 - **No OpenAPI** - tool discovery happens through the MCP protocol itself
 - **No HTTPS** - TLS termination is handled at the PaaS/ingress level; the container listens on plain HTTP
+- **No reference-app dependencies** - the checked-in Test App makes no external calls; connectors created from the template may add explicit typed services
 
 ---
 
@@ -152,11 +170,9 @@ Mcp.Connector.Template/
 ├── Mcp.Connector.Template/               # Main application project
 │   ├── Program.cs                        # Host, DI, endpoints (MapMcp + /health)
 │   ├── Tools/                            # MCP tool classes ([McpServerToolType])
-│   │   └── <ToolName>Tool.cs
-│   ├── Services/                         # External API client wrappers
-│   │   └── <ApiName>Service.cs
+│   │   └── SyntheticEchoTool.cs
 │   ├── Models/                           # DTOs (record types)
-│   │   └── <Domain>Models.cs
+│   │   └── SyntheticEchoResponse.cs
 │   ├── Dockerfile                        # Multi-stage container build
 │   ├── appsettings.json                  # Configuration
 │   └── Properties/
@@ -164,14 +180,12 @@ Mcp.Connector.Template/
 │
 ├── Mcp.Connector.Template.Tests/         # Test project
 │   ├── Unit/                             # Tool logic, validation, DTO mapping
-│   │   ├── <ToolName>ToolTests.cs
-│   │   └── <ApiName>ServiceTests.cs
+│   │   └── SyntheticEchoToolTests.cs
 │   ├── Integration/                      # WebApplicationFactory-based tests
 │   │   ├── HealthEndpointTests.cs
 │   │   └── McpEndpointTests.cs
 │   └── TestInfrastructure/               # Shared test setup
-│       ├── CustomWebApplicationFactory.cs
-│       └── Fake<ApiName>Handler.cs
+│       └── CustomWebApplicationFactory.cs
 │
 └── .github/                              # GitHub configuration (see below)
     ├── copilot-instructions.md
@@ -248,7 +262,7 @@ docker run -p 8080:8080 \
   ghcr.io/adask-b/mcp.connector.template@sha256:<verified-image-digest>
 ```
 
-The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://localhost:8080/mcp`. Once the container is running, VS Code Copilot can use the `getWeather` tool directly in chat.
+The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://localhost:8080/mcp`. Once the container is running, VS Code Copilot can use the `echoSynthetic` tool directly in chat.
 
 ---
 
@@ -316,7 +330,7 @@ The `.vscode/mcp.json` in this repo is preconfigured to connect to `http://local
 dotnet test --configuration Release --verbosity normal
 
 # Specific test file
-dotnet test --filter "FullyQualifiedName~WeatherToolTests"
+dotnet test --filter "FullyQualifiedName~SyntheticEchoToolTests"
 
 # With coverage
 dotnet test --collect:"XPlat Code Coverage"
@@ -414,8 +428,8 @@ Five specialist agents follow an **orchestrator pattern** - use the orchestrator
 **Usage in VS Code:**
 ```
 @orchestrator Add a new tool that calls the Jira API to list issues
-@mcp-tool-creator Create a tool that queries weather data from OpenWeatherMap
-@test Write tests for the WeatherTool class
+@mcp-tool-creator Create a tool that queries a documented external API
+@test Write tests for the SyntheticEchoTool class
 @security Review the CI workflows for supply chain risks
 ```
 
@@ -596,8 +610,8 @@ This template enforces security at multiple levels:
 Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat: add getWeather tool
-fix: handle null response from weather API
+feat: add connector status tool
+fix: reject oversized synthetic payload
 test: add unit tests for input validation
 ci: pin actions/checkout to SHA
 docs: update README with new tool guide
