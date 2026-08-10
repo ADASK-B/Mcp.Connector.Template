@@ -34,11 +34,11 @@ spec:
               containerPort: 8080
           readinessProbe:
             httpGet:
-              path: /health
+              path: /readyz
               port: http
           livenessProbe:
             httpGet:
-              path: /health
+              path: /healthz
               port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

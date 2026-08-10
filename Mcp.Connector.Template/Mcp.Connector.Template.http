@@ -1,7 +1,19 @@
 @Mcp.Connector.Template_HostAddress = http://localhost:5076
 
-### Health probe — container liveness check
-GET {{Mcp.Connector.Template_HostAddress}}/health
+### Process liveness
+GET {{Mcp.Connector.Template_HostAddress}}/healthz
+Accept: application/json
+
+###
+
+### Traffic readiness
+GET {{Mcp.Connector.Template_HostAddress}}/readyz
+Accept: application/json
+
+###
+
+### Exact release identity
+GET {{Mcp.Connector.Template_HostAddress}}/version
 Accept: application/json
 
 ###

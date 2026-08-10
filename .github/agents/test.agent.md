@@ -25,7 +25,7 @@ Mcp.Connector.Template.Tests/
 │   ├── <ToolName>ToolTests.cs         # Tool logic, validation, error paths
 │   └── <ApiName>ServiceTests.cs       # HTTP client mocking, response mapping
 ├── Integration/
-│   ├── HealthEndpointTests.cs         # GET /health → 200
+│   ├── LifecycleEndpointTests.cs      # /healthz, /readyz and /version contracts
 │   └── McpEndpointTests.cs            # MCP JSON-RPC protocol tests
 └── TestInfrastructure/
     ├── CustomWebApplicationFactory.cs # In-memory host with mocked HTTP
