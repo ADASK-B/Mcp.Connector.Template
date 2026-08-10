@@ -18,6 +18,12 @@ Accept: application/json
 
 ###
 
+### Non-sensitive setup-derived configuration
+GET {{Mcp.Connector.Template_HostAddress}}/config
+Accept: application/json
+
+###
+
 ### MCP initialize — start a new MCP session
 POST {{Mcp.Connector.Template_HostAddress}}/mcp
 Content-Type: application/json

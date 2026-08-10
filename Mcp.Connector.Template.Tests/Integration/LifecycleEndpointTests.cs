@@ -49,6 +49,21 @@ public class LifecycleEndpointTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Config_ReturnsExactInjectedNonSensitiveValue()
+    {
+        var response = await _client.GetAsync("/config");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<ApplicationConfigurationResponse>();
+        body.Should().Be(new ApplicationConfigurationResponse(
+            CustomWebApplicationFactory.ConfigurationMessage));
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.EnumerateObject().Select(property => property.Name)
+            .Should().Equal("message");
+    }
+
+    [Fact]
     public async Task LegacyHealthEndpoint_IsNotExposed()
     {
         var response = await _client.GetAsync("/health");
@@ -60,6 +75,7 @@ public class LifecycleEndpointTests : IClassFixture<CustomWebApplicationFactory>
     [InlineData("/healthz")]
     [InlineData("/readyz")]
     [InlineData("/version")]
+    [InlineData("/config")]
     public async Task LifecycleEndpoints_RejectPost(string path)
     {
         var response = await _client.PostAsync(path, content: null);

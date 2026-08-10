@@ -22,6 +22,7 @@ Follow its Red/Green/Refactor cycle and Definition of Done.
 ```
 Mcp.Connector.Template.Tests/
 ├── Unit/
+│   ├── ApplicationConfigurationTests.cs # Generated configuration and negative cases
 │   ├── <ToolName>ToolTests.cs         # Tool logic, validation, error paths
 │   └── <ApiName>ServiceTests.cs       # HTTP client mocking, response mapping
 ├── Integration/

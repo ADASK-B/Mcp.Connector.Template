@@ -1,6 +1,8 @@
 image:
   repository: registry.invalid/reference/mcp-connector
   digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+application:
+  message: synthetic-release-scan-message
 labels:
   app: mcp-connector
   team: mcp-connectors

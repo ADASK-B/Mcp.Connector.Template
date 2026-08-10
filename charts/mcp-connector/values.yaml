@@ -1,5 +1,10 @@
 replicaCount: 2
 
+# Customer value projected exclusively from the canonical resolved setup model.
+# There is intentionally no chart or application default.
+application:
+  message: null
+
 # Required platform workload labels (Kyverno policy: require-labels)
 labels:
   app: ""          # REQUIRED

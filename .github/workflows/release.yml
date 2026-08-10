@@ -63,6 +63,7 @@ jobs:
           helm template mcp-reference charts/mcp-connector \
             --values release/trivy-chart-values.yaml \
             >/dev/null
+          bash scripts/validate-configuration-contract.sh
 
       - name: Log in to Publisher registry F1
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # v4.0.0

@@ -17,6 +17,8 @@ spec:
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
+      annotations:
+        checksum/application-configuration: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         {{- include "mcp-connector.labels" . | nindent 8 }}
     spec:
@@ -32,6 +34,11 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          volumeMounts:
+            - name: application-configuration
+              mountPath: /etc/adask/platform-test/configuration.json
+              subPath: configuration.json
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /readyz
@@ -48,3 +55,7 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+      volumes:
+        - name: application-configuration
+          configMap:
+            name: {{ include "mcp-connector.fullname" . }}-configuration
