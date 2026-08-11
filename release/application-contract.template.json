@@ -1,0 +1,220 @@
+{
+  "apiVersion": "platform.adask-b.io/application-contract/v1alpha9",
+  "kind": "ApplicationContract",
+  "metadata": {"name": "platform-test-app"},
+  "release": {
+    "version": "1.1.0",
+    "evidencePolicyRef": "release/application-platform-test-v1",
+    "delivery": {
+      "repository": "ghcr.io/adask-b/platform-test-app/packages/application-platform-test-app",
+      "mediaType": "application/vnd.zarf.package.v1"
+    },
+    "publisher": {
+      "applicationClass": "platform-test",
+      "artifactClass": "vendor-app",
+      "policyRef": "trust/adask-platform-test-app"
+    },
+    "artifacts": {
+      "chart": {
+        "role": "chart",
+        "repository": "ghcr.io/adask-b/platform-test-app/charts/platform-test-app",
+        "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "mediaType": "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
+      },
+      "service-image": {
+        "role": "image",
+        "repository": "ghcr.io/adask-b/platform-test-app",
+        "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "mediaType": "application/vnd.oci.image.manifest.v1+json"
+      }
+    }
+  },
+  "compatibility": {
+    "profiles": ["onprem-linux-vm-v1"],
+    "architectures": ["amd64"],
+    "foundationAPI": {
+      "id": "platform/application-runtime",
+      "version": {"minInclusive": "1.1.0", "maxExclusive": "2.0.0"}
+    }
+  },
+  "configuration": {
+    "fields": {
+      "message": {
+        "type": "string",
+        "customerRequired": true,
+        "minLength": 1,
+        "maxLength": 128,
+        "render": {"helmValuePath": "application.message"}
+      }
+    }
+  },
+  "requirements": {
+    "platform-runtime": {
+      "kind": "foundation-api",
+      "condition": {"kind": "always"},
+      "api": {
+        "id": "platform/application-runtime",
+        "version": {"minInclusive": "1.1.0", "maxExclusive": "2.0.0"},
+        "features": ["gitops-v1", "restricted-workload-v1", "standard-workload-labels-v1"]
+      }
+    },
+    "kubernetes-workloads": {
+      "kind": "kubernetes-deploy-api",
+      "condition": {"kind": "always"},
+      "resources": [
+        {"group": "apps", "version": "v1", "kind": "Deployment"},
+        {"group": "", "version": "v1", "kind": "ConfigMap"},
+        {"group": "", "version": "v1", "kind": "Service"},
+        {"group": "policy", "version": "v1", "kind": "PodDisruptionBudget"}
+      ]
+    }
+  },
+  "provides": {
+    "apis": {
+      "mcp": {
+        "protocol": "https",
+        "contract": "platform-test-app/mcp",
+        "version": "1.0.0",
+        "authentication": "none",
+        "visibility": "cluster"
+      }
+    }
+  },
+  "deployment": {
+    "mode": "helm",
+    "artifactRef": "chart",
+    "renderer": {
+      "apiVersion": "platform.adask-b.io/application-runtime-values/v1alpha2",
+      "helmValuePath": "platformRuntime"
+    },
+    "replicasValuePath": "replicaCount",
+    "resourcesValuePath": "resources",
+    "imageMappings": {
+      "service-image": {
+        "repositoryValuePath": "image.repository",
+        "digestValuePath": "image.digest"
+      }
+    }
+  },
+  "workloads": {
+    "service": {
+      "kind": "deployment",
+      "imageArtifactRefs": ["service-image"],
+      "runtimeAPIRequirementRefs": []
+    }
+  },
+  "secrets": {},
+  "network": {
+    "ingress": {
+      "mcp": {
+        "protocol": "https",
+        "port": 8080,
+        "tls": "required",
+        "authentication": "none",
+        "exposure": ["internal"]
+      }
+    },
+    "egress": {},
+    "defaultDeny": true
+  },
+  "resources": {
+    "replicas": {"minimum": 1, "maximum": 3},
+    "profiles": {
+      "small": {
+        "requests": {"cpu": "50m", "memory": "64Mi"},
+        "limits": {"cpu": "500m", "memory": "256Mi"}
+      }
+    }
+  },
+  "security": {
+    "profile": "restricted-v1",
+    "podSecurity": "restricted",
+    "runAsNonRoot": true,
+    "privileged": false,
+    "allowPrivilegeEscalation": false,
+    "hostNamespaces": {"network": false, "pid": false, "ipc": false},
+    "hostPathVolumes": false,
+    "seccompProfile": "RuntimeDefault",
+    "linuxCapabilities": {"add": [], "drop": ["ALL"]},
+    "serviceAccounts": {
+      "scope": "per-workload",
+      "rbacScope": "namespace",
+      "tokenAutomount": "runtime-api-requirement-only"
+    },
+    "exceptions": []
+  },
+  "privacy": {
+    "personalData": false,
+    "dataCategories": [],
+    "externalProcessing": false,
+    "deletion": "not-applicable",
+    "export": "not-applicable"
+  },
+  "data": {
+    "persistent": false,
+    "backup": {"required": false, "consistency": "not-applicable"}
+  },
+  "health": {
+    "liveness": {
+      "workloadRef": "service",
+      "protocol": "http",
+      "method": "GET",
+      "path": "/healthz",
+      "port": 8080,
+      "successStatus": 200,
+      "authentication": "none",
+      "semantics": "process-health",
+      "timing": {"initialDelaySeconds": 10, "periodSeconds": 10, "timeoutSeconds": 2, "failureThreshold": 3, "successThreshold": 1}
+    },
+    "readiness": {
+      "workloadRef": "service",
+      "protocol": "http",
+      "method": "GET",
+      "path": "/readyz",
+      "port": 8080,
+      "successStatus": 200,
+      "authentication": "none",
+      "semantics": "accepting-traffic",
+      "timing": {"initialDelaySeconds": 5, "periodSeconds": 5, "timeoutSeconds": 2, "failureThreshold": 3, "successThreshold": 1},
+      "dependencyRequirementRefs": ["platform-runtime"]
+    },
+    "version": {
+      "workloadRef": "service",
+      "protocol": "http",
+      "method": "GET",
+      "path": "/version",
+      "port": 8080,
+      "successStatus": 200,
+      "authentication": "none",
+      "semantics": "exact-release-identity",
+      "timeoutSeconds": 5,
+      "responseSchema": "platform.adask-b.io/application-version-response/v1alpha1"
+    }
+  },
+  "observability": {
+    "metrics": {"required": false},
+    "structuredLogs": true,
+    "tracing": "not-supported",
+    "alerts": {"rules": []}
+  },
+  "lifecycle": {
+    "upgrade": "rolling",
+    "rollback": {
+      "applicationState": "stateless",
+      "policy": "forward-fix-only",
+      "reason": "release-unsupported"
+    },
+    "repair": "gitops",
+    "removal": {
+      "workload": {"action": "prune-generated-gitops"},
+      "data": {
+        "onWorkloadRemoval": "not-applicable",
+        "destruction": {"mode": "not-applicable"},
+        "retentionReview": "not-applicable"
+      },
+      "backups": {"onWorkloadRemoval": "not-applicable"},
+      "externalResources": {"onWorkloadRemoval": "not-applicable"}
+    },
+    "migration": {"mode": "none"}
+  }
+}

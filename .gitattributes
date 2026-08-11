@@ -8,4 +8,10 @@
 *.props text eol=lf
 *.slnx text eol=lf
 *.sh text eol=lf
+*.json text eol=lf
+*.py text eol=lf
+*.tpl text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+LICENSE text eol=lf
 Dockerfile text eol=lf

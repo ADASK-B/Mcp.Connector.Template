@@ -1,5 +1,24 @@
 {{- $repository := required "image.repository is required" .Values.image.repository -}}
 {{- $digest := required "image.digest is required" .Values.image.digest -}}
+{{- $replicas := required "replicaCount is required from the canonical resolved setup model" .Values.replicaCount -}}
+{{- $resources := required "resources are required from the canonical resolved setup model" .Values.resources -}}
+{{- include "mcp-connector.validateRuntime" . -}}
+{{- $workload := required "platformRuntime.workloads.service is required" .Values.platformRuntime.workloads.service -}}
+{{- if ne $workload.kind "deployment" -}}
+{{- fail "platformRuntime.workloads.service.kind must be deployment" -}}
+{{- end -}}
+{{- if not (hasKey $workload "automountServiceAccountToken") -}}
+{{- fail "platformRuntime.workloads.service.automountServiceAccountToken is required" -}}
+{{- end -}}
+{{- if or $workload.hostNamespaces.network $workload.hostNamespaces.pid $workload.hostNamespaces.ipc $workload.hostPathVolumes -}}
+{{- fail "platformRuntime.workloads.service requests forbidden host access" -}}
+{{- end -}}
+{{- if not (hasKey $workload.probes "liveness") -}}
+{{- fail "platformRuntime.workloads.service.probes.liveness is required" -}}
+{{- end -}}
+{{- if not (hasKey $workload.probes "readiness") -}}
+{{- fail "platformRuntime.workloads.service.probes.readiness is required" -}}
+{{- end -}}
 {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
 {{- fail "image.digest must be an immutable sha256 digest" -}}
 {{- end }}
@@ -10,7 +29,7 @@ metadata:
   labels:
     {{- include "mcp-connector.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ $replicas }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "mcp-connector.name" . }}
@@ -22,40 +41,59 @@ spec:
       labels:
         {{- include "mcp-connector.labels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "mcp-connector.fullname" . }}
+      serviceAccountName: {{ required "platformRuntime workload ServiceAccount is required" $workload.serviceAccountName }}
+      automountServiceAccountToken: {{ $workload.automountServiceAccountToken }}
+      hostNetwork: {{ $workload.hostNamespaces.network }}
+      hostPID: {{ $workload.hostNamespaces.pid }}
+      hostIPC: {{ $workload.hostNamespaces.ipc }}
       securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
+        {{- toYaml $workload.podSecurityContext | nindent 8 }}
       containers:
         - name: mcp-connector
           image: "{{ $repository }}@{{ $digest }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 8080
+          {{- with $workload.secrets.environment }}
+          env:
+            {{- range . }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .secretKeyRef.name }}
+                  key: {{ .secretKeyRef.key }}
+            {{- end }}
+          {{- end }}
           volumeMounts:
             - name: application-configuration
               mountPath: /etc/adask/platform-test/configuration.json
               subPath: configuration.json
               readOnly: true
+            {{- range $index, $secret := $workload.secrets.files }}
+            - name: runtime-secret-{{ $index }}
+              mountPath: {{ $secret.mountPath }}
+              subPath: {{ $secret.fileName }}
+              readOnly: true
+            {{- end }}
           readinessProbe:
-            httpGet:
-              path: /readyz
-              port: http
+            {{- toYaml $workload.probes.readiness | nindent 12 }}
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
+            {{- toYaml $workload.probes.liveness | nindent 12 }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml $resources | nindent 12 }}
           securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
+            {{- toYaml $workload.containerSecurityContext | nindent 12 }}
             readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
       volumes:
         - name: application-configuration
           configMap:
             name: {{ include "mcp-connector.fullname" . }}-configuration
+        {{- range $index, $secret := $workload.secrets.files }}
+        - name: runtime-secret-{{ $index }}
+          secret:
+            secretName: {{ $secret.secretKeyRef.name }}
+            items:
+              - key: {{ $secret.secretKeyRef.key }}
+                path: {{ $secret.fileName }}
+        {{- end }}

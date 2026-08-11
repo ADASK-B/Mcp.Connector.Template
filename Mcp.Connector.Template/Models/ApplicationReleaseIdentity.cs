@@ -12,7 +12,7 @@ internal sealed partial record ApplicationReleaseIdentity(
     string ReleaseVersion)
 {
     private const string _resourceName = "Mcp.Connector.Template.release-input.json";
-    private const string _releaseInputSchema = "platform.adask-b.io/app-release-input/v1alpha1";
+    private const string _releaseInputSchema = "platform.adask-b.io/app-release-input/v1alpha2";
     private const string _artifactClass = "vendor-app";
 
     public static ApplicationReleaseIdentity Load(Assembly assembly)

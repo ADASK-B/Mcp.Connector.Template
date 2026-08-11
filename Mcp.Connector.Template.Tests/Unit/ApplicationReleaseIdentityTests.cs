@@ -12,10 +12,10 @@ public class ApplicationReleaseIdentityTests
         using var stream = JsonStream(
             """
             {
-              "schemaVersion": "platform.adask-b.io/app-release-input/v1alpha1",
+              "schemaVersion": "platform.adask-b.io/app-release-input/v1alpha2",
               "artifactClass": "vendor-app",
-              "name": "mcp-connector-reference",
-              "version": "1.0.4",
+              "name": "platform-test-app",
+              "version": "1.1.0",
               "publisher": {}
             }
             """);
@@ -23,14 +23,14 @@ public class ApplicationReleaseIdentityTests
         var identity = ApplicationReleaseIdentity.Parse(stream);
 
         identity.ToResponse().Should()
-            .Be(new ApplicationVersionResponse("mcp-connector-reference", "1.0.4"));
+            .Be(new ApplicationVersionResponse("platform-test-app", "1.1.0"));
     }
 
     [Theory]
-    [InlineData("schemaVersion", "platform.adask-b.io/app-release-input/v1alpha1", "unknown/v1")]
+    [InlineData("schemaVersion", "platform.adask-b.io/app-release-input/v1alpha2", "unknown/v1")]
     [InlineData("artifactClass", "vendor-app", "foundation")]
-    [InlineData("name", "mcp-connector-reference", "Invalid_Name")]
-    [InlineData("version", "1.0.4", "latest")]
+    [InlineData("name", "platform-test-app", "Invalid_Name")]
+    [InlineData("version", "1.1.0", "latest")]
     public void Parse_RejectsUnsupportedOrInvalidIdentity(
         string propertyName,
         string expected,
@@ -51,7 +51,7 @@ public class ApplicationReleaseIdentityTests
     public void Parse_RejectsMissingIdentityField()
     {
         using var stream = JsonStream(
-            ValidJson().Replace("  \"name\": \"mcp-connector-reference\",\n", string.Empty, StringComparison.Ordinal));
+            ValidJson().Replace("  \"name\": \"platform-test-app\",\n", string.Empty, StringComparison.Ordinal));
 
         var action = () => ApplicationReleaseIdentity.Parse(stream);
 
@@ -63,8 +63,8 @@ public class ApplicationReleaseIdentityTests
     {
         using var stream = JsonStream(
             ValidJson().Replace(
-                "  \"version\": \"1.0.4\"",
-                "  \"version\": \"1.0.4\",\n  \"version\": \"1.0.5\"",
+                "  \"version\": \"1.1.0\"",
+                "  \"version\": \"1.1.0\",\n  \"version\": \"1.1.1\"",
                 StringComparison.Ordinal));
 
         var action = () => ApplicationReleaseIdentity.Parse(stream);
@@ -88,10 +88,10 @@ public class ApplicationReleaseIdentityTests
     private static string ValidJson() =>
         """
         {
-          "schemaVersion": "platform.adask-b.io/app-release-input/v1alpha1",
+          "schemaVersion": "platform.adask-b.io/app-release-input/v1alpha2",
           "artifactClass": "vendor-app",
-          "name": "mcp-connector-reference",
-          "version": "1.0.4"
+          "name": "platform-test-app",
+          "version": "1.1.0"
         }
         """;
 }

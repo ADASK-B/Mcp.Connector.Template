@@ -1,41 +1,17 @@
-replicaCount: 2
+replicaCount: null
 
 # Customer value projected exclusively from the canonical resolved setup model.
 # There is intentionally no chart or application default.
 application:
   message: null
 
-# Required platform workload labels (Kyverno policy: require-labels)
-labels:
-  app: ""          # REQUIRED
-  team: ""         # REQUIRED
-  environment: ""  # REQUIRED
-
 image:
-  repository: ""
-  digest: ""
-  pullPolicy: IfNotPresent
+  repository: null
+  digest: null
 
-service:
-  port: 8080
+resources: null
 
-route:
-  enabled: false
-  parentRef:
-    name: platform-gateway
-    namespace: gateway-system
-  hostname: ""
-
-resources:
-  requests:
-    cpu: 50m
-    memory: 64Mi
-  limits:
-    cpu: 500m
-    memory: 256Mi
-
-networkPolicy:
-  ingressNamespaces:
-    - gateway-system
-    - monitoring
-  externalHttpsEgress: false
+# Generated only by platformctl from the canonical resolved setup model.
+# The chart has no fallback labels, security context, probes, Secret wiring or
+# ServiceAccount semantics outside this fixed interface.
+platformRuntime: null

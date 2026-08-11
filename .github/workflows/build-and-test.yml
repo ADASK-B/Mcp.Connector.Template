@@ -4,14 +4,8 @@ name: Build and Test
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
 
 permissions: {}
 
@@ -21,7 +15,7 @@ concurrency:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
 
@@ -29,10 +23,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version-file: .python-version
+
+      - name: Validate the closed release source boundary
+        run: |
+          python scripts/validate_repo.py
+          python scripts/release_pipeline_test.py
+
+      - name: Project the exact release toolchain
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(python -c 'import json; print(json.load(open("release/release-input.json"))["version"])')"
+          python scripts/github_release_env.py --tag "v$VERSION" \
+            --output "$GITHUB_ENV" --github-output "$GITHUB_OUTPUT"
+
       - name: Setup .NET
         uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309  # v5.1.0
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ steps.release.outputs.DOTNET_VERSION }}
 
       - name: Restore dependencies
         run: dotnet restore
@@ -49,48 +62,45 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4  # v4
         with:
-          version: v4.1.3
+          version: ${{ steps.release.outputs.HELM_VERSION }}
 
-      - name: Validate immutable App chart contract
+      - name: Install Foundation-pinned CUE
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --tlsv1.2 "$CUE_SOURCE" -o "$RUNNER_TEMP/cue.tar.gz"
+          echo "$CUE_SHA256  $RUNNER_TEMP/cue.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/cue.tar.gz" -C "$RUNNER_TEMP" cue
+          chmod 0755 "$RUNNER_TEMP/cue"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Validate immutable Application and chart contracts
         shell: bash
         run: |
           set -euo pipefail
           VERSION="$(sed -n 's/^version: //p' charts/mcp-connector/Chart.yaml)"
           test "$(sed -n 's/^appVersion: "\(.*\)"/\1/p' charts/mcp-connector/Chart.yaml)" = "$VERSION"
           test "$(python3 -c 'import json; print(json.load(open("release/release-input.json"))["version"])')" = "$VERSION"
+          CONTRACTS="$RUNNER_TEMP/foundation-contracts"
+          RELEASE_OUTPUT="$RUNNER_TEMP/application-release"
+          python scripts/fetch_foundation_contracts.py --output "$CONTRACTS"
+          python scripts/render_release.py \
+            --image-digest "sha256:$(printf 'a%.0s' {1..64})" \
+            --chart-digest "sha256:$(printf 'b%.0s' {1..64})" \
+            --output "$RELEASE_OUTPUT" \
+            --binding-output "$RUNNER_TEMP/application-package-binding.json"
+          cue vet -c "$CONTRACTS/application-contract.schema.cue" \
+            "$RELEASE_OUTPUT/application-contract.yaml" -d '#ApplicationContract'
+          cue vet -c "$CONTRACTS/application-contract.schema.cue" \
+            "$CONTRACTS/application-delivery-package.schema.cue" \
+            "$RUNNER_TEMP/application-package-binding.json" \
+            -d '#ApplicationZarfPackage'
           helm lint charts/mcp-connector \
             --values release/trivy-chart-values.yaml
-          helm template mcp-reference charts/mcp-connector \
+          helm template platform-test-app charts/mcp-connector \
             --values release/trivy-chart-values.yaml \
             >/dev/null
           bash scripts/validate-configuration-contract.sh
-          release_workflow=.github/workflows/release.yml
-          grep -Fq 'flavor: latest=false' "$release_workflow"
-          grep -Fq 'limit-severities-for-sarif: true' "$release_workflow"
-          grep -Fq 'continue-on-error: true' "$release_workflow"
-          grep -Fq 'SCAN_PREDICATE_TYPE: https://adask-b.io/attestations/security-scan/v1' "$release_workflow"
-          # The next grep asserts a literal workflow variable reference.
-          # shellcheck disable=SC2016
-          test "$(grep -Fc 'cosign attest --yes --type "$SCAN_PREDICATE_TYPE"' "$release_workflow")" -eq 2
-          # The next grep asserts a literal workflow variable reference.
-          # shellcheck disable=SC2016
-          test "$(grep -Fc 'cosign verify-attestation --type "$SCAN_PREDICATE_TYPE"' "$release_workflow")" -eq 1
-          grep -Fq 'output: chart-trivy-results.sarif' "$release_workflow"
-          grep -Fq 'TRIVY_HELM_VALUES: release/trivy-chart-values.yaml' "$release_workflow"
-          grep -Fq 'output-file: chart-sbom.spdx.json' "$release_workflow"
-          if grep -Eq '^[[:space:]]+push:[[:space:]]+true$' "$release_workflow"; then
-            echo 'Release workflow must scan before publishing.' >&2
-            exit 1
-          fi
-          scan_line="$(grep -nF -- '- name: Scan immutable image' "$release_workflow" | cut -d: -f1)"
-          publish_line="$(grep -nF -- '- name: Publish scanned immutable image' "$release_workflow" | cut -d: -f1)"
-          sign_line="$(grep -nF -- '- name: Sign and attest published image' "$release_workflow" | cut -d: -f1)"
-          chart_scan_line="$(grep -nF -- '- name: Scan immutable Helm chart' "$release_workflow" | cut -d: -f1)"
-          chart_line="$(grep -nF -- '- name: Publish immutable Helm chart' "$release_workflow" | cut -d: -f1)"
-          test "$scan_line" -lt "$publish_line"
-          test "$chart_scan_line" -lt "$publish_line"
-          test "$publish_line" -lt "$sign_line"
-          test "$sign_line" -lt "$chart_line"
 
       - name: Generate coverage report
         if: always()

@@ -1,9 +1,63 @@
 image:
-  repository: registry.invalid/reference/mcp-connector
+  repository: registry.invalid/reference/platform-test-app
   digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 application:
   message: synthetic-release-scan-message
-labels:
-  app: mcp-connector
-  team: mcp-connectors
-  environment: reference
+replicaCount: 2
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+platformRuntime:
+  apiVersion: platform.adask-b.io/application-runtime-values/v1alpha2
+  application:
+    id: platform-test-app
+    releaseVersion: 1.1.0
+    namespace: vendor-platform-test-app
+    trustZone: vendor-apps
+    standardLabels:
+      app: platform-test-app
+      team: vendor-apps
+      environment: release-rehearsal
+  workloads:
+    service:
+      kind: deployment
+      serviceAccountName: platform-test-app-service
+      automountServiceAccountToken: false
+      hostNamespaces: {network: false, pid: false, ipc: false}
+      hostPathVolumes: false
+      podSecurityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containerSecurityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        capabilities: {add: [], drop: [ALL]}
+      probes:
+        liveness:
+          httpGet: {path: /healthz, port: 8080, scheme: HTTP}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+          successThreshold: 1
+        readiness:
+          httpGet: {path: /readyz, port: 8080, scheme: HTTP}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 3
+          successThreshold: 1
+      secrets: {environment: [], files: []}
+  health:
+    version:
+      workloadRef: service
+      httpGet: {path: /version, port: 8080, scheme: HTTP}
+      timeoutSeconds: 5
+      responseSchema: platform.adask-b.io/application-version-response/v1alpha1
+      expectedIdentity:
+        applicationId: platform-test-app
+        releaseVersion: 1.1.0
