@@ -382,7 +382,7 @@ Runs `dotnet restore` → `dotnet build` → `dotnet test`. This is the primary 
 **File:** `.github/workflows/release.yml`
 **Trigger:** reviewed SemVer tag (`v*`)
 
-The tag workflow accepts only the exact `v1.1.0` release input and a source
+The tag workflow accepts only the exact `v1.1.1` release input and a source
 commit already contained in `main`. It verifies a vendored snapshot of the
 Foundation's ApplicationContract v1alpha9 and delivery-package schemas against
 their immutable source commit and SHA-256 digests, runs unit/negative/chart

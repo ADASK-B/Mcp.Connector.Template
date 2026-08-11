@@ -52,8 +52,8 @@ def collect_errors() -> list[str]:
         errors.append("release input must select ApplicationContract v1alpha9")
     if release.get("applicationClass") != "platform-test" or release.get("artifactClass") != "vendor-app":
         errors.append("release class must be platform-test/vendor-app")
-    if release.get("name") != "platform-test-app" or release.get("version") != "1.1.0":
-        errors.append("release stable identity/version differs from the reviewed 1.1.0 boundary")
+    if release.get("name") != "platform-test-app" or release.get("version") != "1.1.1":
+        errors.append("release stable identity/version differs from the reviewed 1.1.1 boundary")
     image_values_path = release.get("imageValuesPath")
     if not isinstance(image_values_path, str) or not image_values_path_selects_a_pinned_image(image_values_path):
         errors.append("imageValuesPath must select the chart repository/digest pair")
@@ -122,7 +122,13 @@ def collect_errors() -> list[str]:
     else:
         for name, expected in schemas.items():
             path = snapshot / name
-            if path.is_symlink() or not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            content = path.read_bytes() if path.is_file() and not path.is_symlink() else b""
+            canonical = content.replace(b"\r\n", b"\n")
+            if (
+                not content
+                or b"\r" in canonical
+                or hashlib.sha256(canonical).hexdigest() != expected
+            ):
                 errors.append(f"vendored Foundation schema bytes differ from the bound commit: {name}")
 
     toolchain = release.get("toolchain") or {}
@@ -156,6 +162,9 @@ def collect_errors() -> list[str]:
             errors.append(f"{name} source/version/digest differs from the Foundation pin")
     if (ROOT / ".python-version").read_text(encoding="utf-8").strip() != "3.13.14":
         errors.append("setup-python input must equal the release toolchain pin")
+    attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+    if "*.cue text eol=lf" not in attributes:
+        errors.append("vendored CUE schema bytes must be checked out with LF endings")
 
     license_contract = release.get("license") or {}
     if license_contract.get("expression") != "MIT":
@@ -267,6 +276,31 @@ def collect_errors() -> list[str]:
     manifest_position = release_workflow.find("scripts/release_manifest.py")
     if package_position < 0 or manifest_position < package_position:
         errors.append("publisher manifest must be created only after signed package publication")
+    mandatory_image_scan = re.search(
+        r"- name: Scan immutable image\n(?P<body>.*?)(?=\n      - name:)",
+        release_workflow,
+        re.DOTALL,
+    )
+    if mandatory_image_scan is None or not all(
+        marker in mandatory_image_scan.group("body")
+        for marker in (
+            "format: json", "output: trivy-image.json",
+            "severity: CRITICAL,HIGH", "exit-code: '1'",
+        )
+    ):
+        errors.append("mandatory image scan must be a severity-filtered JSON gate")
+    if "Re-read the image scan as an attestable report" in release_workflow:
+        errors.append("release must not substitute a second scan for the mandatory image gate result")
+    sarif_mirror = re.search(
+        r"- name: Generate full image SARIF mirror\n(?P<body>.*?)(?=\n      - name:)",
+        release_workflow,
+        re.DOTALL,
+    )
+    if sarif_mirror is None or not all(
+        marker in sarif_mirror.group("body")
+        for marker in ("format: sarif", "output: trivy-results.sarif", "exit-code: '0'")
+    ) or "continue-on-error" in sarif_mirror.group("body"):
+        errors.append("full SARIF evidence must be generated separately without defining the vulnerability gate")
 
     build_workflow = (ROOT / ".github/workflows/build-and-test.yml").read_text(encoding="utf-8")
     for required in (

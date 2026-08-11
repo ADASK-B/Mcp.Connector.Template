@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize the exact vendored Foundation CUE schema snapshot."""
+"""Materialize the exact canonical-LF Foundation CUE schema snapshot."""
 
 from __future__ import annotations
 
@@ -15,6 +15,13 @@ ROOT = Path(__file__).resolve().parent.parent
 SNAPSHOT = ROOT / "release/foundation-contracts"
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
+
+
+def canonical_lf(content: bytes) -> bytes:
+    normalized = content.replace(b"\r\n", b"\n")
+    if b"\r" in normalized:
+        raise ValueError("vendored Foundation schema contains a non-canonical carriage return")
+    return normalized
 
 
 def fetch(output: Path) -> list[Path]:
@@ -40,7 +47,7 @@ def fetch(output: Path) -> list[Path]:
         source = SNAPSHOT / name
         if source.is_symlink() or not source.is_file():
             raise ValueError(f"vendored Foundation schema is missing or unsafe: {name}")
-        content = source.read_bytes()
+        content = canonical_lf(source.read_bytes())
         observed = hashlib.sha256(content).hexdigest()
         if observed != expected:
             raise ValueError(f"vendored Foundation schema digest mismatch: {name}")

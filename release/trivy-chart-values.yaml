@@ -15,7 +15,7 @@ platformRuntime:
   apiVersion: platform.adask-b.io/application-runtime-values/v1alpha2
   application:
     id: platform-test-app
-    releaseVersion: 1.1.0
+    releaseVersion: 1.1.1
     namespace: vendor-platform-test-app
     trustZone: vendor-apps
     standardLabels:
@@ -60,4 +60,4 @@ platformRuntime:
       responseSchema: platform.adask-b.io/application-version-response/v1alpha1
       expectedIdentity:
         applicationId: platform-test-app
-        releaseVersion: 1.1.0
+        releaseVersion: 1.1.1

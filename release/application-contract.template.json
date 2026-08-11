@@ -3,7 +3,7 @@
   "kind": "ApplicationContract",
   "metadata": {"name": "platform-test-app"},
   "release": {
-    "version": "1.1.0",
+    "version": "1.1.1",
     "evidencePolicyRef": "release/application-platform-test-v1",
     "delivery": {
       "repository": "ghcr.io/adask-b/platform-test-app/packages/application-platform-test-app",

@@ -15,7 +15,7 @@ public class ApplicationReleaseIdentityTests
               "schemaVersion": "platform.adask-b.io/app-release-input/v1alpha2",
               "artifactClass": "vendor-app",
               "name": "platform-test-app",
-              "version": "1.1.0",
+              "version": "1.1.1",
               "publisher": {}
             }
             """);
@@ -23,14 +23,14 @@ public class ApplicationReleaseIdentityTests
         var identity = ApplicationReleaseIdentity.Parse(stream);
 
         identity.ToResponse().Should()
-            .Be(new ApplicationVersionResponse("platform-test-app", "1.1.0"));
+            .Be(new ApplicationVersionResponse("platform-test-app", "1.1.1"));
     }
 
     [Theory]
     [InlineData("schemaVersion", "platform.adask-b.io/app-release-input/v1alpha2", "unknown/v1")]
     [InlineData("artifactClass", "vendor-app", "foundation")]
     [InlineData("name", "platform-test-app", "Invalid_Name")]
-    [InlineData("version", "1.1.0", "latest")]
+    [InlineData("version", "1.1.1", "latest")]
     public void Parse_RejectsUnsupportedOrInvalidIdentity(
         string propertyName,
         string expected,
@@ -63,8 +63,8 @@ public class ApplicationReleaseIdentityTests
     {
         using var stream = JsonStream(
             ValidJson().Replace(
-                "  \"version\": \"1.1.0\"",
-                "  \"version\": \"1.1.0\",\n  \"version\": \"1.1.1\"",
+                "  \"version\": \"1.1.1\"",
+                "  \"version\": \"1.1.1\",\n  \"version\": \"1.1.2\"",
                 StringComparison.Ordinal));
 
         var action = () => ApplicationReleaseIdentity.Parse(stream);
@@ -91,7 +91,7 @@ public class ApplicationReleaseIdentityTests
           "schemaVersion": "platform.adask-b.io/app-release-input/v1alpha2",
           "artifactClass": "vendor-app",
           "name": "platform-test-app",
-          "version": "1.1.0"
+          "version": "1.1.1"
         }
         """;
 }
