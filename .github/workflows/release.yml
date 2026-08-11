@@ -165,13 +165,22 @@ jobs:
           version: ${{ steps.release.outputs.TRIVY_VERSION }}
           cache-dir: ${{ github.workspace }}/.cache/trivy
           input: ${{ runner.temp }}/platform-test-app-oci
-          format: sarif
-          output: trivy-results.sarif
+          format: json
+          output: trivy-image.json
           severity: CRITICAL,HIGH
           exit-code: '1'
 
+      - name: Generate full image SARIF mirror
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # 0.35.0
+        with:
+          version: ${{ steps.release.outputs.TRIVY_VERSION }}
+          cache-dir: ${{ github.workspace }}/.cache/trivy
+          input: ${{ runner.temp }}/platform-test-app-oci
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '0'
+
       - name: Mirror image scan evidence to GitHub Code Scanning
-        if: always()
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98  # v4.32.6
         with:
@@ -202,17 +211,6 @@ jobs:
           scan-ref: rendered-chart
           format: json
           output: trivy-chart.json
-          severity: CRITICAL,HIGH
-          exit-code: '1'
-
-      - name: Re-read the image scan as an attestable report
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # 0.35.0
-        with:
-          version: ${{ steps.release.outputs.TRIVY_VERSION }}
-          cache-dir: ${{ github.workspace }}/.cache/trivy
-          input: ${{ runner.temp }}/platform-test-app-oci
-          format: json
-          output: trivy-image.json
           severity: CRITICAL,HIGH
           exit-code: '1'
 

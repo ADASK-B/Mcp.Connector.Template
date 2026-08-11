@@ -5,6 +5,7 @@
 # Files consumed by Unix tools or governed by the LF EditorConfig contract.
 *.cs text eol=lf
 *.csproj text eol=lf
+*.cue text eol=lf
 *.props text eol=lf
 *.slnx text eol=lf
 *.sh text eol=lf

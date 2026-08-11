@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
+import fetch_foundation_contracts  # noqa: E402
 import github_release_env  # noqa: E402
 import license_predicate  # noqa: E402
 import name_sbom  # noqa: E402
@@ -71,15 +72,42 @@ class ReleaseContractTests(unittest.TestCase):
         finally:
             release_path.write_text(original, encoding="utf-8", newline="\n")
 
+        workflow_path = ROOT / ".github/workflows/release.yml"
+        workflow = workflow_path.read_text(encoding="utf-8")
+        try:
+            workflow_path.write_text(
+                workflow.replace(
+                    "format: json\n          output: trivy-image.json",
+                    "format: sarif\n          output: trivy-results.sarif",
+                    1,
+                ),
+                encoding="utf-8",
+                newline="\n",
+            )
+            self.assertIn(
+                "mandatory image scan must be a severity-filtered JSON gate",
+                validate_repo.collect_errors(),
+            )
+        finally:
+            workflow_path.write_text(workflow, encoding="utf-8", newline="\n")
+
     def test_release_environment_accepts_only_exact_release_tag(self) -> None:
-        entries = github_release_env.entries("v1.1.0")
-        self.assertEqual("1.1.0", entries["RELEASE_VERSION"])
+        entries = github_release_env.entries("v1.1.1")
+        self.assertEqual("1.1.1", entries["RELEASE_VERSION"])
         self.assertEqual("10.0.400", entries["DOTNET_VERSION"])
         self.assertEqual("ghcr.io/adask-b/platform-test-app", entries["IMAGE_REPOSITORY"])
         with self.assertRaises(ValueError):
-            github_release_env.entries("v1.1.1")
+            github_release_env.entries("v1.1.2")
         with self.assertRaises(ValueError):
             github_release_env.entries("latest")
+
+    def test_foundation_schema_snapshot_canonicalizes_only_line_endings(self) -> None:
+        self.assertEqual(
+            b"schema\nvalue\n",
+            fetch_foundation_contracts.canonical_lf(b"schema\r\nvalue\r\n"),
+        )
+        with self.assertRaises(ValueError):
+            fetch_foundation_contracts.canonical_lf(b"schema\rvalue\n")
 
     def test_rendered_contract_and_package_bind_exact_distinct_artifacts(self) -> None:
         contract, package, binding = render_release.render(DIGEST_A, DIGEST_B)
@@ -140,7 +168,7 @@ class EvidenceTests(unittest.TestCase):
         evidence = license_predicate.build(
             SUBJECT,
             "platform-test-app-image",
-            "1.1.0",
+            "1.1.1",
             COMMIT,
             "2026-08-12T00:00:00Z",
             "LICENSE",
@@ -149,18 +177,18 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual("MIT", evidence["components"][0]["licenseExpression"])
         with self.assertRaises(ValueError):
             license_predicate.build(
-                SUBJECT, "dependency", "1.1.0", COMMIT,
+                SUBJECT, "dependency", "1.1.1", COMMIT,
                 "2026-08-12T00:00:00Z", "LICENSE"
             )
 
     def test_provenance_binds_source_two_base_images_and_keyless_identity(self) -> None:
         identity = (
             "https://github.com/ADASK-B/Mcp.Connector.Template/"
-            ".github/workflows/release.yml@refs/tags/v1.1.0"
+            ".github/workflows/release.yml@refs/tags/v1.1.1"
         )
         evidence = provenance_predicate.build(
             COMMIT,
-            "v1.1.0",
+            "v1.1.1",
             [f"mcr.microsoft.com/dotnet/aspnet@{DIGEST_A}", f"mcr.microsoft.com/dotnet/sdk@{DIGEST_B}"],
             identity,
             "https://github.com/ADASK-B/Mcp.Connector.Template/actions/runs/1/attempts/1",
@@ -170,15 +198,15 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(3, len(evidence["buildDefinition"]["resolvedDependencies"]))
         with self.assertRaises(ValueError):
             provenance_predicate.build(
-                COMMIT, "v1.1.0", [f"example.invalid/base@{DIGEST_A}"], identity,
+                COMMIT, "v1.1.1", [f"example.invalid/base@{DIGEST_A}"], identity,
                 "run", "2026-08-12T00:00:00Z", "2026-08-12T00:01:00Z"
             )
         with self.assertRaises(ValueError):
             provenance_predicate.build(
                 COMMIT,
-                "v1.1.0",
+                "v1.1.1",
                 [f"example.invalid/a@{DIGEST_A}", f"example.invalid/b@{DIGEST_B}"],
-                "https://github.com/other/repository/release.yml@refs/tags/v1.1.0",
+                "https://github.com/other/repository/release.yml@refs/tags/v1.1.1",
                 "run",
                 "2026-08-12T00:00:00Z",
                 "2026-08-12T00:01:00Z",
@@ -207,14 +235,14 @@ class EvidenceTests(unittest.TestCase):
             scan_predicate.build(report, SUBJECT, {"HIGH"}, "2026-08-12T00:00:00Z")
 
     def test_sbom_and_build_local_values_require_immutable_subjects(self) -> None:
-        sbom = name_sbom.bind({"packages": [{"SPDXID": "SPDXRef-Package"}]}, SUBJECT, "1.1.0", "MIT")
+        sbom = name_sbom.bind({"packages": [{"SPDXID": "SPDXRef-Package"}]}, SUBJECT, "1.1.1", "MIT")
         self.assertEqual(["SPDXRef-ReleasedArtifact"], sbom["documentDescribes"])
         self.assertEqual(
             {"image": {"repository": "ghcr.io/adask-b/platform-test-app", "digest": DIGEST_A}},
             render_artifact_values.render("ghcr.io/adask-b/platform-test-app", DIGEST_A),
         )
         with self.assertRaises(ValueError):
-            name_sbom.bind({"packages": []}, SUBJECT, "1.1.0", "MIT")
+            name_sbom.bind({"packages": []}, SUBJECT, "1.1.1", "MIT")
         with self.assertRaises(ValueError):
             render_artifact_values.render("ghcr.io/adask-b/platform-test-app:latest", DIGEST_A)
 
@@ -254,7 +282,7 @@ class RegistryTests(unittest.TestCase):
 
         self.assertTrue(
             registry_tag_absent.is_absent(
-                "ghcr.io/adask-b/platform-test-app", "1.1.0", "publisher", "token",
+                "ghcr.io/adask-b/platform-test-app", "1.1.1", "publisher", "token",
                 open_request=open_request,
             )
         )
@@ -263,12 +291,12 @@ class RegistryTests(unittest.TestCase):
     def test_anonymous_404_or_missing_credentials_do_not_prove_absence(self) -> None:
         with self.assertRaises(registry_tag_absent.RegistryProbeError):
             registry_tag_absent.is_absent(
-                "ghcr.io/adask-b/platform-test-app", "1.1.0", "publisher", "token",
+                "ghcr.io/adask-b/platform-test-app", "1.1.1", "publisher", "token",
                 open_request=lambda request, timeout: Response(404),
             )
         with self.assertRaises(registry_tag_absent.RegistryProbeError):
             registry_tag_absent.is_absent(
-                "ghcr.io/adask-b/platform-test-app", "1.1.0", "", "",
+                "ghcr.io/adask-b/platform-test-app", "1.1.1", "", "",
                 open_request=lambda request, timeout: Response(404),
             )
 
@@ -286,7 +314,7 @@ class OciLayoutTests(unittest.TestCase):
                 "config": {
                     "Labels": {
                         "org.opencontainers.image.revision": COMMIT,
-                        "org.opencontainers.image.version": "1.1.0",
+                        "org.opencontainers.image.version": "1.1.1",
                         "org.opencontainers.image.licenses": "NOASSERTION",
                     }
                 },
@@ -338,7 +366,7 @@ class OciLayoutTests(unittest.TestCase):
                 metadata,
                 manifest_digest=manifest_digest,
                 revision=COMMIT,
-                version="1.1.0",
+                version="1.1.1",
             )
             orphan = root / "blobs" / "sha256" / ("f" * 64)
             orphan.write_bytes(b"orphan")
@@ -348,7 +376,7 @@ class OciLayoutTests(unittest.TestCase):
                     metadata,
                     manifest_digest=manifest_digest,
                     revision=COMMIT,
-                    version="1.1.0",
+                    version="1.1.1",
                 )
 
 

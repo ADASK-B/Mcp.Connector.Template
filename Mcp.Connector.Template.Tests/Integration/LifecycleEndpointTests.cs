@@ -41,7 +41,7 @@ public class LifecycleEndpointTests : IClassFixture<CustomWebApplicationFactory>
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<ApplicationVersionResponse>();
-        body.Should().Be(new ApplicationVersionResponse("platform-test-app", "1.1.0"));
+        body.Should().Be(new ApplicationVersionResponse("platform-test-app", "1.1.1"));
 
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         document.RootElement.EnumerateObject().Select(property => property.Name)
