@@ -4,7 +4,7 @@
 [![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.0-blue)](https://github.com/modelcontextprotocol/csharp-sdk)
 [![Build and Test](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/build-and-test.yml)
 [![CodeQL](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/codeql.yml/badge.svg)](https://github.com/ADASK-B/Mcp.Connector.Template/actions/workflows/codeql.yml)
-[![Docker](https://img.shields.io/badge/Docker-GHCR-2496ed?logo=docker&logoColor=white)](https://github.com/ADASK-B/Mcp.Connector.Template/pkgs/container/mcp.connector.template)
+[![Docker](https://img.shields.io/badge/Docker-GHCR-2496ed?logo=docker&logoColor=white)](https://github.com/ADASK-B/Mcp.Connector.Template/pkgs/container/platform-test-app)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > **Reusable template and deliberately small Platform Test Application** for
@@ -79,10 +79,12 @@ This repository currently proves that the independent Test App source builds
 and that its liveness, readiness, and exact release-identity endpoints satisfy
 their local contract tests. It also proves the local chart-to-file-to-`/config`
 contract for one non-sensitive `application.message` value, without a chart,
-environment, CLI, or application default. Live setup-to-cluster configuration,
-Secret, storage, controlled egress, observability, a qualifying signed release,
-delivery, activation, convergence, security, rollback, recovery, air-gap, and
-production gates remain separate Platform-plan work.
+environment, CLI, or application default. The tag-only publisher source defines
+the same signed Application/Zarf evidence path used by independent Apps, but
+source code alone is not publication evidence. Live setup-to-cluster
+configuration, Secret, storage, controlled egress, metrics, a qualifying signed
+release, delivery, activation, convergence, security, rollback, recovery,
+air-gap, and production gates remain separate Platform-plan work.
 
 ---
 
@@ -157,6 +159,7 @@ graph TD
 - **No reference-app dependencies** - the checked-in Test App makes no external calls; connectors created from the template may add explicit typed services
 - **Immutable runtime identity** - `/version` reads release identity embedded at build time from `release/release-input.json`; there is no environment or runtime fallback
 - **One configuration path** - the chart requires centrally generated `application.message`, mounts one typed JSON file, and the process fails startup if that file is absent or invalid
+- **One generated runtime boundary** - labels, ServiceAccount selection, probes, security context and optional generic Secret wiring come only from `platformRuntime`; the App chart does not install parallel RBAC, NetworkPolicy, routing or customer values
 
 ---
 
@@ -379,26 +382,38 @@ Runs `dotnet restore` → `dotnet build` → `dotnet test`. This is the primary 
 **File:** `.github/workflows/release.yml`
 **Trigger:** reviewed SemVer tag (`v*`)
 
-Builds the multi-stage image locally, packages the App-owned Helm chart, and
-scans both before publication. It emits separate SPDX SBOMs plus provenance,
-then publishes and immediately signs both objects in Publisher ingress F1.
-Their SBOM, provenance and blocking scan results are signed OCI attestations;
-both digests and every required attestation are verified against the workflow's
-OIDC identity. The workflow never writes to customer F2 and never publishes
-`latest`.
+The tag workflow accepts only the exact `v1.1.0` release input and a source
+commit already contained in `main`. It verifies a vendored snapshot of the
+Foundation's ApplicationContract v1alpha9 and delivery-package schemas against
+their immutable source commit and SHA-256 digests, runs unit/negative/chart
+contract gates, builds one Linux/amd64 OCI layout, and scans the image plus
+rendered chart before the first F1 mutation.
 
-The image and chart SARIF reports remain mandatory immutable release evidence.
-Their additional upload to GitHub Code Scanning is best-effort so a private-
-repository plan without that API cannot bypass or falsely fail either blocking
-scan.
+It publishes the image to `ghcr.io/adask-b/platform-test-app`, the chart to
+`ghcr.io/adask-b/platform-test-app/charts/platform-test-app`, and an
+availability-only signed Zarf package to
+`ghcr.io/adask-b/platform-test-app/packages/application-platform-test-app`.
+The image and chart each receive an exact keyless signature plus SPDX, SLSA v1,
+typed vulnerability-scan and reviewed release-owned MIT licence attestations;
+all are read back against the exact tag-workflow identity. The Zarf package is
+created from those digest-bound subjects, keyless-signed, published and
+re-verified. A separately keyless-signed publisher manifest records only gates
+that actually completed.
+
+The blocking Trivy reports and immutable evidence are retained even when the
+best-effort image SARIF mirror is unavailable. The workflow never writes to F2,
+never activates Git or Kubernetes desired state, never uses ORAS and never
+publishes `latest`. `release/release-input.json` keeps production eligibility
+false and explicitly records the still-open F2, complete OSS-distribution,
+runtime-convergence, production-gate and server-side branch-protection gaps.
 
 | Step | Action |
 |------|--------|
-| Validate | Exact tag, chart and release-input versions; .NET tests; Helm lint/render |
-| Publish | Image and Helm chart to `ghcr.io/adask-b/mcp.connector.template` (F1) |
-| Evidence | Image/chart Trivy SARIF, separate SPDX SBOMs, deterministic provenance and release manifest |
-| Trust | Keyless Cosign signatures and verification against the exact workflow identity |
-| Delivery | A separate approved workflow promotes selected digests from F1 to customer F2b |
+| Validate | Exact tag/main ancestry; closed source, .NET, CUE, Helm and negative contract gates |
+| Build | One verified Linux/amd64 OCI layout; exact pinned SDK/runtime materials |
+| Evidence | Blocking image/chart Trivy results, separate SPDX SBOMs, SLSA v1 and narrow licence evidence |
+| Trust | Keyless Cosign signatures/attestations plus a keyless signed Zarf package, all read back against the exact workflow identity |
+| Availability | Image, chart and package in Publisher F1 only; customer-selected Approved Delivery to F2b remains separate |
 
 ### CodeQL Analysis
 

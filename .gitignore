@@ -16,6 +16,8 @@
 [Rr]elease/
 !release/
 !release/release-input.json
+__pycache__/
+*.py[cod]
 x64/
 x86/
 [Ww][Ii][Nn]32/

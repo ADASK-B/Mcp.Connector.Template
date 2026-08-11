@@ -1,5 +1,5 @@
 ---
-name: Publish signed MCP reference release
+name: Publish signed Platform Test App release
 
 on:
   push:
@@ -12,9 +12,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_REPOSITORY: ghcr.io/adask-b/mcp.connector.template
-  CHART_REPOSITORY: ghcr.io/adask-b/mcp.connector.template/charts/mcp-connector
   SCAN_PREDICATE_TYPE: https://adask-b.io/attestations/security-scan/v1
+  LICENSE_PREDICATE_TYPE: https://adask-b.io/attestations/license/v1
+  PROVENANCE_COSIGN_TYPE: slsaprovenance1
 
 jobs:
   publish:
@@ -30,39 +30,79 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version-file: .python-version
+
+      - name: Load and validate the closed release input
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "BUILD_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          python scripts/github_release_env.py --tag "$GITHUB_REF_NAME" \
+            --output "$GITHUB_ENV" --github-output "$GITHUB_OUTPUT"
+          python scripts/validate_repo.py
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
+
       - name: Setup .NET
         uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309  # v5.1.0
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ steps.release.outputs.DOTNET_VERSION }}
 
       - name: Set up Helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4  # v4
         with:
-          version: v4.1.3
+          version: ${{ steps.release.outputs.HELM_VERSION }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22  # v4.1.0
+        with:
+          cosign-release: ${{ steps.release.outputs.COSIGN_VERSION }}
 
-      - name: Validate exact release contract
+      - name: Install Foundation-pinned CUE and Zarf binaries
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test "$(sed -n 's/^version: //p' charts/mcp-connector/Chart.yaml)" = "$VERSION"
-          test "$(sed -n 's/^appVersion: "\(.*\)"/\1/p' charts/mcp-connector/Chart.yaml)" = "$VERSION"
-          test "$(python3 -c 'import json; print(json.load(open("release/release-input.json"))["version"])')" = "$VERSION"
+          curl --fail --location --proto '=https' --tlsv1.2 "$CUE_SOURCE" -o "$RUNNER_TEMP/cue.tar.gz"
+          echo "$CUE_SHA256  $RUNNER_TEMP/cue.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/cue.tar.gz" -C "$RUNNER_TEMP" cue
+          curl --fail --location --proto '=https' --tlsv1.2 "$ZARF_SOURCE" -o "$RUNNER_TEMP/zarf"
+          echo "$ZARF_SHA256  $RUNNER_TEMP/zarf" | sha256sum --check --strict
+          chmod 0755 "$RUNNER_TEMP/cue" "$RUNNER_TEMP/zarf"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Run source, contract, unit and chart gates
+        shell: bash
+        run: |
+          set -euo pipefail
           dotnet restore
           dotnet build --configuration Release --no-restore
           dotnet test --configuration Release --no-build --verbosity normal
-          helm lint charts/mcp-connector \
-            --values release/trivy-chart-values.yaml
-          helm template mcp-reference charts/mcp-connector \
-            --values release/trivy-chart-values.yaml \
-            >/dev/null
+          python scripts/release_pipeline_test.py
+          python scripts/fetch_foundation_contracts.py --output .generated/foundation-contracts
+          python scripts/render_release.py \
+            --image-digest "sha256:$(printf 'a%.0s' {1..64})" \
+            --chart-digest "sha256:$(printf 'b%.0s' {1..64})" \
+            --output .generated/release-contract-rehearsal \
+            --binding-output .generated/release-contract-rehearsal.binding.json
+          cue vet -c \
+            .generated/foundation-contracts/application-contract.schema.cue \
+            .generated/release-contract-rehearsal/application-contract.yaml \
+            -d '#ApplicationContract'
+          cue vet -c \
+            .generated/foundation-contracts/application-contract.schema.cue \
+            .generated/foundation-contracts/application-delivery-package.schema.cue \
+            .generated/release-contract-rehearsal.binding.json \
+            -d '#ApplicationZarfPackage'
+          helm lint charts/mcp-connector --values release/trivy-chart-values.yaml
+          helm template platform-test-app charts/mcp-connector \
+            --values release/trivy-chart-values.yaml >/dev/null
           bash scripts/validate-configuration-contract.sh
 
       - name: Log in to Publisher registry F1
@@ -72,50 +112,65 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Refuse an existing immutable release version
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for REPOSITORY in "$IMAGE_REPOSITORY" "$CHART_REPOSITORY" "$PACKAGE_REPOSITORY"; do
+            python scripts/registry_tag_absent.py --repository "$REPOSITORY" \
+              --tag "$RELEASE_VERSION" --username "$GITHUB_ACTOR"
+          done
+
       - name: Extract immutable image metadata
         id: meta
         uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf  # v6.0.0
         with:
-          images: ${{ env.IMAGE_REPOSITORY }}
+          images: ${{ steps.release.outputs.IMAGE_REPOSITORY }}
           flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
-            type=sha,format=long
+          labels: |
+            org.opencontainers.image.licenses=NOASSERTION
 
-      - name: Reject mutable image tags
-        shell: bash
-        env:
-          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
-        run: |
-          set -euo pipefail
-          if grep -Fxq "${IMAGE_REPOSITORY}:latest" <<< "$IMAGE_TAGS"; then
-            echo 'The release must never publish the mutable latest tag.' >&2
-            exit 1
-          fi
-
-      - name: Build image for pre-publication scan
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
+      - name: Build release image locally without registry mutation
+        id: image_build
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294  # v7.0.0
         with:
           context: .
           file: ./Mcp.Connector.Template/Dockerfile
           push: false
-          load: true
+          platforms: linux/amd64
+          provenance: false
+          outputs: type=oci,dest=${{ runner.temp }}/platform-test-app-oci,tar=false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+
+      - name: Bind the OCI layout to this release build
+        env:
+          OCI_LAYOUT: ${{ runner.temp }}/platform-test-app-oci
+          LOCAL_IMAGE_DIGEST: ${{ steps.image_build.outputs.digest }}
+          LOCAL_IMAGE_METADATA: ${{ steps.image_build.outputs.metadata }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/verify_oci_layout.py --layout "$OCI_LAYOUT" \
+            --manifest-digest "$LOCAL_IMAGE_DIGEST" \
+            --revision "$GITHUB_SHA" --version "$RELEASE_VERSION"
 
       - name: Scan immutable image
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # 0.35.0
         with:
-          image-ref: ${{ env.IMAGE_REPOSITORY }}:${{ steps.meta.outputs.version }}
+          version: ${{ steps.release.outputs.TRIVY_VERSION }}
+          cache-dir: ${{ github.workspace }}/.cache/trivy
+          input: ${{ runner.temp }}/platform-test-app-oci
           format: sarif
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
-          limit-severities-for-sarif: true
           exit-code: '1'
 
-      - name: Mirror vulnerability evidence to GitHub Code Scanning
+      - name: Mirror image scan evidence to GitHub Code Scanning
         if: always()
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98  # v4.32.6
@@ -123,192 +178,265 @@ jobs:
           sarif_file: trivy-results.sarif
           category: trivy/image
 
-      - name: Package immutable Helm chart
-        id: chart-package
+      - name: Render the chart with this run's immutable image
+        env:
+          IMAGE_DIGEST: ${{ steps.image_build.outputs.digest }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p release-output
-          helm package charts/mcp-connector --destination release-output
-          path="release-output/mcp-connector-${{ steps.meta.outputs.version }}.tgz"
-          test -f "$path"
-          echo "path=$path" >> "$GITHUB_OUTPUT"
+          mkdir -p rendered-chart release-output
+          python scripts/render_artifact_values.py --repository "$IMAGE_REPOSITORY" \
+            --digest "$IMAGE_DIGEST" --output release-output/artifact-values.json
+          helm template platform-test-app charts/mcp-connector \
+            --values release/trivy-chart-values.yaml \
+            --values release-output/artifact-values.json \
+            > rendered-chart/manifests.yaml
+          test -s rendered-chart/manifests.yaml
 
-      - name: Scan immutable Helm chart
+      - name: Scan the rendered chart
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # 0.35.0
-        env:
-          TRIVY_HELM_VALUES: release/trivy-chart-values.yaml
         with:
-          scan-type: fs
-          scan-ref: charts/mcp-connector
-          format: sarif
-          output: chart-trivy-results.sarif
-          scanners: vuln,secret,misconfig
+          version: ${{ steps.release.outputs.TRIVY_VERSION }}
+          cache-dir: ${{ github.workspace }}/.cache/trivy
+          scan-type: config
+          scan-ref: rendered-chart
+          format: json
+          output: trivy-chart.json
           severity: CRITICAL,HIGH
-          limit-severities-for-sarif: true
           exit-code: '1'
 
-      - name: Mirror chart vulnerability evidence to GitHub Code Scanning
-        if: always()
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98  # v4.32.6
+      - name: Re-read the image scan as an attestable report
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # 0.35.0
         with:
-          sarif_file: chart-trivy-results.sarif
-          category: trivy/chart
+          version: ${{ steps.release.outputs.TRIVY_VERSION }}
+          cache-dir: ${{ github.workspace }}/.cache/trivy
+          input: ${{ runner.temp }}/platform-test-app-oci
+          format: json
+          output: trivy-image.json
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+      - name: Capture scanner database identity
+        shell: bash
+        run: trivy version --cache-dir "$GITHUB_WORKSPACE/.cache/trivy" --format json > trivy-version.json
 
       - name: Generate image SBOM
         uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d  # v0
         with:
-          image: ${{ env.IMAGE_REPOSITORY }}:${{ steps.meta.outputs.version }}
+          syft-version: ${{ steps.release.outputs.SYFT_VERSION }}
+          image: oci-dir:${{ runner.temp }}/platform-test-app-oci
           format: spdx-json
-          output-file: sbom.spdx.json
+          output-file: sbom.image.spdx.json
 
       - name: Generate chart SBOM
         uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d  # v0
         with:
-          file: ${{ steps.chart-package.outputs.path }}
+          syft-version: ${{ steps.release.outputs.SYFT_VERSION }}
+          path: charts/mcp-connector
           format: spdx-json
-          output-file: chart-sbom.spdx.json
+          output-file: sbom.chart.spdx.json
           upload-artifact: false
 
-      - name: Create deterministic provenance
+      - name: Package release chart locally
         shell: bash
         run: |
-          python3 - <<'PY'
-          import json
-          import os
+          set -euo pipefail
+          helm package charts/mcp-connector --destination release-output
+          test "$(find release-output -maxdepth 1 -type f -name 'platform-test-app-*.tgz' | wc -l)" -eq 1
 
-          predicate = {
-              "buildType": "https://github.com/ADASK-B/platform-release/v1",
-              "builder": {"id": os.environ["GITHUB_WORKFLOW_REF"]},
-              "invocation": {"configSource": {
-                  "uri": f"git+https://github.com/{os.environ['GITHUB_REPOSITORY']}@{os.environ['GITHUB_REF']}",
-                  "digest": {"sha1": os.environ["GITHUB_SHA"]},
-              }},
-              "metadata": {"buildInvocationId": os.environ["GITHUB_RUN_ID"]},
-          }
-          with open("provenance.json", "w", encoding="utf-8") as handle:
-              json.dump(predicate, handle, sort_keys=True, separators=(",", ":"))
-          PY
-
-      - name: Publish scanned immutable image
-        id: image
-        shell: bash
+      - name: Publish preflighted artifacts to Publisher F1
+        id: publication
         env:
-          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
-        run: |
-          set -euo pipefail
-          version_ref="${IMAGE_REPOSITORY}:${{ steps.meta.outputs.version }}"
-          digest=''
-          while IFS= read -r tag; do
-            [[ -n "$tag" ]] || continue
-            output="$(docker push "$tag" 2>&1)"
-            printf '%s\n' "$output"
-            if [[ "$tag" == "$version_ref" ]]; then
-              digest="$(printf '%s\n' "$output" | awk '/digest:/ {for (i=1; i<=NF; i++) if ($i == "digest:") print $(i+1)}' | tail -1)"
-            fi
-          done <<< "$IMAGE_TAGS"
-          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-
-      - name: Sign and attest published image
-        env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          OCI_LAYOUT: ${{ runner.temp }}/platform-test-app-oci
+          LOCAL_IMAGE_DIGEST: ${{ steps.image_build.outputs.digest }}
         shell: bash
         run: |
           set -euo pipefail
-          image="${IMAGE_REPOSITORY}@${IMAGE_DIGEST}"
-          cosign sign --yes "$image"
-          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$image"
-          cosign attest --yes --type slsaprovenance --predicate provenance.json "$image"
-          cosign attest --yes --type "$SCAN_PREDICATE_TYPE" --predicate trivy-results.sarif "$image"
-
-      - name: Publish immutable Helm chart
-        id: chart
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf '%s' "${{ secrets.GITHUB_TOKEN }}" | \
-            helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-          OUTPUT="$(helm push "${{ steps.chart-package.outputs.path }}" \
-            oci://ghcr.io/adask-b/mcp.connector.template/charts 2>&1)"
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" | zarf tools registry login \
+            --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+          zarf tools registry push "$OCI_LAYOUT" "$IMAGE_REPOSITORY:$RELEASE_VERSION"
+          IMAGE_DIGEST="$(zarf tools registry digest "$IMAGE_REPOSITORY:$RELEASE_VERSION")"
+          test "$IMAGE_DIGEST" = "$LOCAL_IMAGE_DIGEST"
+          IMAGE_MEDIA_TYPE="$(zarf tools registry manifest "$IMAGE_REPOSITORY:$RELEASE_VERSION" | \
+            python -c 'import json,sys; print(json.load(sys.stdin)["mediaType"])')"
+          test "$IMAGE_MEDIA_TYPE" = 'application/vnd.oci.image.manifest.v1+json'
+          OUTPUT="$(helm push release-output/platform-test-app-*.tgz \
+            oci://ghcr.io/adask-b/platform-test-app/charts 2>&1)"
           printf '%s\n' "$OUTPUT"
-          DIGEST="$(printf '%s\n' "$OUTPUT" | awk '/Digest:/ {print $2}' | tail -1)"
-          test -n "$DIGEST"
-          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          CHART_DIGEST="$(printf '%s\n' "$OUTPUT" | awk '/Digest:/ {print $2}' | tail -1)"
+          printf '%s\n' "$CHART_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
+          echo "image_digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "chart_digest=$CHART_DIGEST" >> "$GITHUB_OUTPUT"
 
-      - name: Sign and attest published chart
+      - name: Generate typed release evidence
         env:
-          CHART_DIGEST: ${{ steps.chart.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.publication.outputs.image_digest }}
+          CHART_DIGEST: ${{ steps.publication.outputs.chart_digest }}
         shell: bash
         run: |
           set -euo pipefail
-          chart="${CHART_REPOSITORY}@${CHART_DIGEST}"
-          cosign sign --yes "$chart"
-          cosign attest --yes --type spdxjson --predicate chart-sbom.spdx.json "$chart"
-          cosign attest --yes --type slsaprovenance --predicate provenance.json "$chart"
-          cosign attest --yes --type "$SCAN_PREDICATE_TYPE" --predicate chart-trivy-results.sarif "$chart"
+          IMAGE="$IMAGE_REPOSITORY@$IMAGE_DIGEST"
+          CHART="$CHART_REPOSITORY@$CHART_DIGEST"
+          IDENTITY="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF"
+          FINISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          DB_UPDATED_AT="$(python scripts/trivy_database_time.py --version-json trivy-version.json)"
+          python scripts/name_sbom.py --sbom sbom.image.spdx.json \
+            --subject "$IMAGE" --version "$RELEASE_VERSION" --license NOASSERTION
+          python scripts/name_sbom.py --sbom sbom.chart.spdx.json \
+            --subject "$CHART" --version "$RELEASE_VERSION" --license MIT
+          python scripts/scan_predicate.py --report trivy-image.json \
+            --artifact-name "$IMAGE" --severities CRITICAL,HIGH \
+            --database-updated-at "$DB_UPDATED_AT" --output scan.image.json
+          python scripts/scan_predicate.py --report trivy-chart.json \
+            --artifact-name "$CHART" --severities CRITICAL,HIGH \
+            --database-updated-at "$DB_UPDATED_AT" --output scan.chart.json
+          python scripts/provenance_predicate.py --source-commit "$GITHUB_SHA" \
+            --tag "$GITHUB_REF_NAME" --base-image "$RUNTIME_BASE_IMAGE" \
+            --base-image "$SDK_BASE_IMAGE" --workflow-identity "$IDENTITY" \
+            --invocation-id "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+            --started-on "$BUILD_STARTED_AT" --finished-on "$FINISHED_AT" \
+            --output provenance.json
+          python scripts/license_predicate.py --artifact "$IMAGE" \
+            --component platform-test-app-image --version "$RELEASE_VERSION" \
+            --source-commit "$GITHUB_SHA" --reviewed-at "$FINISHED_AT" \
+            --license-text LICENSE --output license.image.json
+          python scripts/license_predicate.py --artifact "$CHART" \
+            --component platform-test-app-chart --version "$RELEASE_VERSION" \
+            --source-commit "$GITHUB_SHA" --reviewed-at "$FINISHED_AT" \
+            --license-text LICENSE --output license.chart.json
 
-      - name: Verify release and create manifest
+      - name: Sign, attest and verify OCI artifacts
         env:
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-          CHART_DIGEST: ${{ steps.chart.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.publication.outputs.image_digest }}
+          CHART_DIGEST: ${{ steps.publication.outputs.chart_digest }}
         shell: bash
         run: |
           set -euo pipefail
-          export IDENTITY="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@${GITHUB_REF}"
-          export ISSUER="https://token.actions.githubusercontent.com"
-          for SUBJECT in "${IMAGE_REPOSITORY}@${IMAGE_DIGEST}" "${CHART_REPOSITORY}@${CHART_DIGEST}"; do
+          IMAGE="$IMAGE_REPOSITORY@$IMAGE_DIGEST"
+          CHART="$CHART_REPOSITORY@$CHART_DIGEST"
+          IDENTITY="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF"
+          ISSUER="https://token.actions.githubusercontent.com"
+          cosign sign --yes "$IMAGE"
+          cosign sign --yes "$CHART"
+          cosign attest --yes --type spdxjson --predicate sbom.image.spdx.json "$IMAGE"
+          cosign attest --yes --type spdxjson --predicate sbom.chart.spdx.json "$CHART"
+          cosign attest --yes --type "$PROVENANCE_COSIGN_TYPE" --predicate provenance.json "$IMAGE"
+          cosign attest --yes --type "$PROVENANCE_COSIGN_TYPE" --predicate provenance.json "$CHART"
+          cosign attest --yes --type "$SCAN_PREDICATE_TYPE" --predicate scan.image.json "$IMAGE"
+          cosign attest --yes --type "$SCAN_PREDICATE_TYPE" --predicate scan.chart.json "$CHART"
+          cosign attest --yes --type "$LICENSE_PREDICATE_TYPE" --predicate license.image.json "$IMAGE"
+          cosign attest --yes --type "$LICENSE_PREDICATE_TYPE" --predicate license.chart.json "$CHART"
+          for SUBJECT in "$IMAGE" "$CHART"; do
             cosign verify --certificate-identity "$IDENTITY" \
-              --certificate-oidc-issuer "$ISSUER" "$SUBJECT"
-            cosign verify-attestation --type spdxjson --certificate-identity "$IDENTITY" \
               --certificate-oidc-issuer "$ISSUER" "$SUBJECT" >/dev/null
-            cosign verify-attestation --type slsaprovenance --certificate-identity "$IDENTITY" \
-              --certificate-oidc-issuer "$ISSUER" "$SUBJECT" >/dev/null
-            cosign verify-attestation --type "$SCAN_PREDICATE_TYPE" --certificate-identity "$IDENTITY" \
-              --certificate-oidc-issuer "$ISSUER" "$SUBJECT" >/dev/null
+            for TYPE in spdxjson "$PROVENANCE_COSIGN_TYPE" "$SCAN_PREDICATE_TYPE" "$LICENSE_PREDICATE_TYPE"; do
+              cosign verify-attestation --type "$TYPE" --certificate-identity "$IDENTITY" \
+                --certificate-oidc-issuer "$ISSUER" "$SUBJECT" >/dev/null
+            done
           done
-          python3 - <<'PY'
-          import json
-          import os
 
-          manifest = {
-              "schemaVersion": "platform.adask-b.io/publisher-release/v1alpha1",
-              "artifactClass": "vendor-app",
-              "name": "mcp-connector-reference",
-              "version": os.environ["GITHUB_REF_NAME"].removeprefix("v"),
-              "source": {
-                  "repository": os.environ["GITHUB_REPOSITORY"],
-                  "commit": os.environ["GITHUB_SHA"],
-              },
-              "image": {
-                  "reference": os.environ["IMAGE_REPOSITORY"],
-                  "digest": os.environ["IMAGE_DIGEST"],
-              },
-              "chart": {
-                  "reference": os.environ["CHART_REPOSITORY"],
-                  "digest": os.environ["CHART_DIGEST"],
-              },
-              "signer": {"identity": os.environ["IDENTITY"], "issuer": os.environ["ISSUER"]},
-              "evidence": ["provenance", "sbom", "signature", "vulnerability-scan"],
-          }
-          with open("release-manifest.json", "w", encoding="utf-8") as handle:
-              json.dump(manifest, handle, indent=2, sort_keys=True)
-              handle.write("\n")
-          PY
+      - name: Create, keyless-sign, publish and verify the availability-only Zarf package
+        id: package
+        env:
+          IMAGE_DIGEST: ${{ steps.publication.outputs.image_digest }}
+          CHART_DIGEST: ${{ steps.publication.outputs.chart_digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_DIR="release-output/zarf-source"
+          PACKAGE_DIR="release-output/packages"
+          python scripts/render_release.py --image-digest "$IMAGE_DIGEST" \
+            --chart-digest "$CHART_DIGEST" --output "$SOURCE_DIR" \
+            --binding-output release-output/application-package-binding.json
+          cue vet \
+            .generated/foundation-contracts/application-contract.schema.cue \
+            .generated/foundation-contracts/application-delivery-package.schema.cue \
+            release-output/application-package-binding.json \
+            -d '#ApplicationZarfPackage'
+          zarf package create "$SOURCE_DIR" --confirm --skip-sbom --output "$PACKAGE_DIR"
+          mapfile -t PACKAGES < <(find "$PACKAGE_DIR" -maxdepth 1 -type f -name 'zarf-package-*.tar.zst' -print)
+          test "${#PACKAGES[@]}" -eq 1
+          PACKAGE="${PACKAGES[0]}"
+          OIDC_RESPONSE="$RUNNER_TEMP/zarf-oidc-response.json"
+          OIDC_TOKEN="$RUNNER_TEMP/zarf-oidc-token"
+          umask 077
+          trap 'rm -f "$OIDC_RESPONSE" "$OIDC_TOKEN"' EXIT
+          curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sigstore" > "$OIDC_RESPONSE"
+          python -c 'import json,sys; value=json.load(open(sys.argv[1]))["value"]; open(sys.argv[2],"w").write(value)' \
+            "$OIDC_RESPONSE" "$OIDC_TOKEN"
+          chmod 0600 "$OIDC_TOKEN"
+          zarf package sign "$PACKAGE" --keyless --identity-token "$OIDC_TOKEN" --confirm
+          rm -f "$OIDC_RESPONSE" "$OIDC_TOKEN"
+          IDENTITY="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF"
+          ISSUER="https://token.actions.githubusercontent.com"
+          zarf package inspect definition "$PACKAGE" --verify=always \
+            --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" \
+            --no-color > release-output/zarf-definition.verified.yaml
+          PACKAGE_NAMESPACE="${PACKAGE_REPOSITORY%/*}"
+          zarf package publish "$PACKAGE" "oci://$PACKAGE_NAMESPACE" --confirm --verify=always \
+            --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER"
+          SOURCE="oci://$PACKAGE_REPOSITORY:$RELEASE_VERSION"
+          PACKAGE_DIGEST="$(zarf package inspect digest "$SOURCE" --no-color)"
+          printf '%s\n' "$PACKAGE_DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
+          zarf package inspect definition "$SOURCE" --verify=always \
+            --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" \
+            --no-color > release-output/zarf-definition.f1.verified.yaml
+          echo "digest=$PACKAGE_DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Create immutable non-production release manifest
+        env:
+          IMAGE_DIGEST: ${{ steps.publication.outputs.image_digest }}
+          CHART_DIGEST: ${{ steps.publication.outputs.chart_digest }}
+          PACKAGE_DIGEST: ${{ steps.package.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/release_manifest.py \
+            --image-digest "$IMAGE_DIGEST" --chart-digest "$CHART_DIGEST" \
+            --package-digest "$PACKAGE_DIGEST" --source-commit "$GITHUB_SHA" \
+            --contract release-output/zarf-source/application-contract.yaml \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --output release-manifest.json
+
+      - name: Sign and verify publisher release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          IDENTITY="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF"
+          ISSUER="https://token.actions.githubusercontent.com"
+          cosign sign-blob --yes --bundle release-manifest.bundle.json release-manifest.json
+          cosign verify-blob --bundle release-manifest.bundle.json \
+            --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" \
+            release-manifest.json
 
       - name: Upload release evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
-          name: mcp-connector-${{ github.ref_name }}-evidence
+          name: platform-test-app-${{ github.ref_name }}-evidence
           path: |
             release-manifest.json
-            sbom.spdx.json
-            chart-sbom.spdx.json
+            release-manifest.bundle.json
+            release-output/zarf-source/application-contract.yaml
+            release-output/zarf-source/zarf.yaml
+            release-output/application-package-binding.json
+            release-output/zarf-definition.*.yaml
+            release-output/packages/*.tar.zst
+            sbom.image.spdx.json
+            sbom.chart.spdx.json
             provenance.json
+            scan.image.json
+            scan.chart.json
+            license.image.json
+            license.chart.json
             trivy-results.sarif
-            chart-trivy-results.sarif
+            trivy-image.json
+            trivy-chart.json
+            trivy-version.json
+            rendered-chart/manifests.yaml
             release-output/*.tgz
+            LICENSE
           if-no-files-found: error
 
       - name: Create immutable GitHub release
@@ -316,12 +444,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
+          set -euo pipefail
           release_flags=(--verify-tag --generate-notes)
-          production_eligible="$(python3 -c 'import json; print(str(json.load(open("release/release-input.json"))["productionEligible"]).lower())')"
-          if [[ "$production_eligible" != "true" ]]; then
+          if [[ "$(python -c 'import json; print(str(json.load(open("release/release-input.json"))["productionEligible"]).lower())')" != "true" ]]; then
             release_flags+=(--prerelease)
           fi
           gh release create "$GITHUB_REF_NAME" \
-            release-manifest.json sbom.spdx.json chart-sbom.spdx.json provenance.json \
-            trivy-results.sarif chart-trivy-results.sarif \
-            release-output/*.tgz "${release_flags[@]}"
+            release-manifest.json release-manifest.bundle.json \
+            release-output/zarf-source/application-contract.yaml \
+            release-output/zarf-source/zarf.yaml \
+            sbom.image.spdx.json sbom.chart.spdx.json provenance.json \
+            scan.image.json scan.chart.json license.image.json license.chart.json LICENSE \
+            "${release_flags[@]}"
